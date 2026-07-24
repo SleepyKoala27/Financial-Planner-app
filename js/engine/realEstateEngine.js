@@ -447,8 +447,14 @@ FP.engine = (function () {
       properties.forEach(function (proj) {
         var row = proj.rows[t]; if (!row) return;
         tot.marketValue += num(row.marketValue); tot.mortgageBalance += num(row.mortgageBalance);
-        tot.equity += num(row.equity); tot.noi += num(row.noi); tot.cashFlow += num(row.cashFlow);
+        tot.noi += num(row.noi); tot.cashFlow += num(row.cashFlow);
         tot.grossRevenue += num(row.grossRevenue);
+        // B2: in the SALE year the property's value is realized as after-tax sale
+        // proceeds (added below), so its equity must NOT also be counted in the
+        // portfolio equity total — that was double-counting in RE wealth. A `sold`
+        // row is either the sale year (equity still populated) or an already-sold
+        // year (equity 0); skipping equity on any `sold` row is correct for both.
+        if (!row.sold) tot.equity += num(row.equity);
         if (row.sold && row.disposition) tot.saleProceedsThisYear += num(row.disposition.netAfterTax);
       });
       cumulativeSaleProceeds += tot.saleProceedsThisYear;
