@@ -1,0 +1,1939 @@
+<!-- =============================================================================
+     index.html  —  Real-Estate Modeling Engine (Phase 1)
+
+     Plain HTML. No build step, no frameworks, no CDNs. Every script below is a
+     local file loaded with a normal script tag, in dependency order:
+       1) tax-law params   2) structural facts   3) input schema + your data
+       4) tax interface     5) the calculation engine
+       6) UI helpers (format, charts, tables)     7) the app controller
+     ============================================================================ -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Real-Estate Modeling Engine — Phase 1</title>
+  <style>
+/* =============================================================================
+ *  styles.css  —  tablet-first styling (no frameworks)
+ * =============================================================================
+ *  Goals: readable at iPad width, touch-friendly targets (min ~40px), wide
+ *  tables scroll sideways instead of overflowing, works in light or dark.
+ * ---------------------------------------------------------------------------*/
+
+:root {
+  --bg: #f5f6f8;
+  --panel: #ffffff;
+  --ink: #1c2430;
+  --muted: #5b6670;
+  --line: #dfe3e8;
+  --accent: #2f7ed8;
+  --pos: #1f8a4c;
+  --neg: #c0392b;
+  --ph: #b8791f;      /* placeholder badge */
+  --prov: #8e44ad;    /* provisional badge */
+  --radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12161c; --panel: #1b2029; --ink: #e6eaef; --muted: #9aa4af;
+    --line: #2a323d; --accent: #5aa2ec;
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* ---- header + toolbar ---- */
+.fp-header { padding: 18px 16px 8px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.fp-header h1 { margin: 0 0 4px; font-size: 1.5rem; }
+.fp-phase { font-size: .8rem; color: var(--accent); vertical-align: middle; }
+.fp-sub { margin: 0 0 12px; color: var(--muted); }
+.fp-toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.fp-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 44px; padding: 8px 14px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--ink); border-radius: 10px;
+  font-size: 1rem; cursor: pointer; touch-action: manipulation;
+}
+.fp-btn:active { transform: translateY(1px); }
+.fp-btn-file { position: relative; }
+.fp-btn-danger { border-color: var(--neg); color: var(--neg); }
+
+/* ---- layout ---- */
+.fp-main { max-width: 1100px; margin: 0 auto; padding: 12px 12px 60px; }
+.fp-section { background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 14px 14px; margin: 14px 0; }
+.fp-section h2 { margin: 0 0 10px; font-size: 1.2rem; }
+.fp-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fp-subhead { margin: 14px 0 6px; font-size: 1rem; color: var(--muted); }
+.fp-muted { color: var(--muted); }
+
+/* ---- badges ---- */
+.fp-badge { display: inline-block; font-size: .7rem; font-weight: 700; letter-spacing: .03em;
+  padding: 2px 7px; border-radius: 999px; vertical-align: middle; margin-left: 4px; color: #fff; }
+.fp-badge-ph { background: var(--ph); }
+.fp-badge-prov { background: var(--prov); }
+.fp-badge-sale { background: var(--accent); }
+
+/* ---- metric cards ---- */
+.fp-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.fp-cards-sm { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.fp-metric { border: 1px solid var(--line); border-top: 3px solid var(--accent);
+  border-radius: 10px; padding: 12px; background: var(--panel); }
+.fp-metric-hi { border-top-color: var(--pos); }
+.fp-metric-value { font-size: 1.35rem; font-weight: 700; }
+.fp-metric-label { color: var(--muted); font-size: .85rem; margin-top: 2px; }
+
+/* ---- charts ---- */
+.fp-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+.fp-chartcard { border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.fp-chart-title { font-weight: 600; margin-bottom: 6px; }
+.fp-chart-wrap { width: 100%; overflow: hidden; }
+.fp-chart { width: 100%; height: auto; display: block; }
+.fp-grid { stroke: var(--line); stroke-width: 1; }
+.fp-zero { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; }
+.fp-axislabel { fill: var(--muted); font-size: 11px; }
+.fp-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; font-size: .82rem; color: var(--muted); }
+.fp-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.fp-swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+/* ---- tables (scroll sideways on narrow screens) ---- */
+.fp-tablescroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fp-table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: .9rem; }
+.fp-table th, .fp-table td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.fp-table th:first-child, .fp-table td:first-child { text-align: left; position: sticky; left: 0; background: var(--panel); }
+.fp-table th { color: var(--muted); font-weight: 600; }
+.fp-pos { color: var(--pos); }
+.fp-neg { color: var(--neg); }
+.fp-sold-row td { color: var(--muted); font-style: italic; }
+
+/* ---- disposition detail ---- */
+.fp-disposition { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+.fp-provisional-note { color: var(--prov); background: rgba(142,68,173,.08);
+  padding: 8px 10px; border-radius: 8px; font-size: .9rem; }
+.fp-warning { color: var(--neg); background: rgba(192,57,43,.10); font-weight: 600;
+  padding: 8px 10px; border-radius: 8px; font-size: .9rem; }
+.fp-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.fp-detail-block h4 { margin: 0 0 6px; font-size: .95rem; }
+.fp-detail-block.fp-provisional { outline: 2px dashed var(--prov); outline-offset: 2px; border-radius: 8px; }
+.fp-kv { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.fp-kv td { padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.fp-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* ---- input forms ---- */
+.fp-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin: 12px 0; }
+.fp-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fp-card-head h3 { margin: 0; flex: 1 1 auto; font-size: 1.05rem; }
+.fp-tier { margin: 12px 0 6px; font-size: .9rem; color: var(--accent); border-top: 1px solid var(--line); padding-top: 8px; }
+.fp-fieldgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.fp-field { display: flex; flex-direction: column; gap: 3px; font-size: .85rem; }
+.fp-field-label { color: var(--muted); }
+.fp-field-help { color: var(--muted); font-size: .72rem; }
+.fp-field input, .fp-field select, #globalControls input, #globalControls select {
+  min-height: 40px; padding: 6px 8px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--bg); color: var(--ink); font-size: 1rem; width: 100%;
+}
+.fp-field input[type=checkbox] { width: 24px; height: 24px; min-height: 0; }
+.fp-notes { color: var(--muted); font-size: .82rem; margin: 8px 0 0; }
+
+.fp-customstate { align-items: end; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+
+/* ---- residency editor ---- */
+.fp-residency-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.fp-residency-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
+.fp-residency-cell { display: flex; flex-direction: column; gap: 2px; font-size: .78rem; color: var(--muted); }
+.fp-residency-cell select { min-height: 40px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+
+/* ---- misc ---- */
+.fp-details { border: 1px solid var(--line); border-radius: 10px; margin: 10px 0; padding: 4px 10px; }
+.fp-details summary { cursor: pointer; padding: 8px 0; font-weight: 600; }
+.fp-footer { color: var(--muted); font-size: .82rem; text-align: center; margin-top: 20px; }
+
+</style>
+</head>
+<body>
+  <header class="fp-header">
+    <h1>Real-Estate Modeling Engine <span class="fp-phase">Phase 1</span></h1>
+    <p class="fp-sub">
+      All calculations run in your browser. Nothing is uploaded anywhere.
+      <span class="fp-badge fp-badge-ph">PLACEHOLDER DATA</span>
+      <span class="fp-badge fp-badge-prov">FEDERAL TAX = PROVISIONAL</span>
+    </p>
+    <div class="fp-toolbar">
+      <button id="btnSave" class="fp-btn" type="button">💾 Save scenario (JSON)</button>
+      <label class="fp-btn fp-btn-file">📂 Load scenario
+        <input id="fileLoad" type="file" accept="application/json,.json" hidden />
+      </label>
+      <button id="btnReset" class="fp-btn" type="button">↺ Reset to sample</button>
+    </div>
+  </header>
+
+  <main class="fp-main">
+
+    <!-- ---- Headline metrics ---- -->
+    <section class="fp-section">
+      <h2>Portfolio at a glance</h2>
+      <div id="summaryCards" class="fp-cards"></div>
+      <h3 class="fp-subhead">Per-property return on equity (cash flow ÷ equity)</h3>
+      <div id="propertyMetricCards" class="fp-cards fp-cards-sm"></div>
+    </section>
+
+    <!-- ---- Charts ---- -->
+    <section class="fp-section">
+      <h2>Time-series charts</h2>
+      <div id="charts" class="fp-charts"></div>
+    </section>
+
+    <!-- ---- Portfolio table ---- -->
+    <section class="fp-section">
+      <h2>Portfolio totals (year by year)</h2>
+      <div id="portfolioTable"></div>
+    </section>
+
+    <!-- ---- Sale-year tax detail ---- -->
+    <section class="fp-section">
+      <h2>Sale-year tax detail</h2>
+      <div id="dispositions"></div>
+    </section>
+
+    <!-- ---- Per-property tables ---- -->
+    <section class="fp-section">
+      <h2>Per-property detail</h2>
+      <div id="propertyTables"></div>
+    </section>
+
+    <!-- ---- Inputs: global settings ---- -->
+    <section class="fp-section">
+      <h2>Settings</h2>
+      <div id="globalControls" class="fp-fieldgrid"></div>
+    </section>
+
+    <!-- ---- Inputs: residency by year ---- -->
+    <section class="fp-section">
+      <h2>Residency by year</h2>
+      <p class="fp-muted">Pick where you live each year (WA or CA). This decides the
+        <em>resident state</em> tax on any sale in that year.</p>
+      <div id="residencyEditor"></div>
+    </section>
+
+    <!-- ---- Inputs: custom states ---- -->
+    <section class="fp-section">
+      <div class="fp-section-head">
+        <h2>Custom states</h2>
+        <button id="btnAddState" class="fp-btn" type="button">+ Add state</button>
+      </div>
+      <p class="fp-muted">Add a source state or a future domicile with its own income-tax
+        rate. It becomes selectable as a property's state and as a residency. (WA, CA, CO,
+        OR are built in.)</p>
+      <div id="customStatesEditor"></div>
+    </section>
+
+    <!-- ---- Inputs: properties ---- -->
+    <section class="fp-section">
+      <div class="fp-section-head">
+        <h2>Properties</h2>
+        <button id="btnAddProperty" class="fp-btn" type="button">+ Add property</button>
+      </div>
+      <div id="propertyEditors"></div>
+    </section>
+
+    <footer class="fp-footer">
+      <p>Real-Estate Modeling Engine · Phase 1 · Deterministic, all-local.
+         Federal tax is provisional (see the sale-tax section). Not tax advice.</p>
+    </footer>
+  </main>
+
+  <!-- Entire app inlined into this one file (no separate files needed). -->
+  <script>
+/* ===== js/params/taxParams2026.js ===== */
+/* =============================================================================
+ *  taxParams2026.js  —  TAX-LAW PARAMETERS  (dated & versioned)
+ * =============================================================================
+ *
+ *  WHAT THIS FILE IS
+ *  -----------------
+ *  Every number in here comes from tax law, not from your personal situation.
+ *  It is deliberately kept in ONE place so that when a rate or threshold
+ *  changes, you edit it here once — never inside a calculation function.
+ *  (This is the project's "no magic numbers" rule.)
+ *
+ *  Each value carries:
+ *    - a plain-English name,
+ *    - a source (the law/agency it comes from),
+ *    - an effective date / tax year it applies to.
+ *
+ *  IMPORTANT: These are approximate, rounded figures for planning. They are NOT
+ *  tax advice. Confirm rates with a professional before making decisions.
+ *
+ *  VERSIONING: The filename ends in "2026". When you want a later year, COPY
+ *  this file to taxParams2027.js, change the numbers, and point userInputs.js
+ *  (or the UI) at the new version. Old versions stay as a record.
+ * ---------------------------------------------------------------------------*/
+
+window.FP = window.FP || {}; // shared namespace for the whole app
+
+FP.taxParams2026 = {
+  // Bookkeeping about this parameter set itself.
+  meta: {
+    version: '2026.1',
+    taxYear: 2026,
+    lastReviewed: '2026-07-24',
+    note: 'Planning approximations. Not tax advice. Verify before relying on them.'
+  },
+
+  // ---- FEDERAL: long-term capital gains & related ----------------------------
+  federal: {
+    // Top long-term capital-gains rate. Source: IRC §1(h). The bracket you land
+    // in depends on total taxable income (not modeled in Phase 1), so the
+    // PROVISIONAL federal calc assumes the TOP rate (your instruction).
+    longTermTopRate: 0.20,       // 20% — highest LTCG bracket
+    longTermMidRate: 0.15,       // 15% — middle LTCG bracket (kept for later use)
+
+    // Unrecaptured §1250 gain (depreciation recapture on real property) is taxed
+    // at a maximum of 25%. Source: IRC §1(h)(1)(E).
+    depreciationRecaptureRate: 0.25,
+
+    // Net Investment Income Tax. Source: IRC §1411 (effective since 2013).
+    // Thresholds are NOT indexed for inflation.
+    niitRate: 0.038,             // 3.8%
+    niitThresholdMFJ: 250000,    // married filing jointly
+    niitThresholdSingle: 200000, // single
+    // PROVISIONAL assumption: because we don't yet model your other income, we
+    // assume you are above the NIIT threshold (consistent with the top-rate
+    // assumption). taxInterface.js honors this flag.
+    assumeAboveNIITThreshold: true,
+
+    // §121 principal-residence gain exclusion. Source: IRC §121.
+    section121ExclusionMFJ: 500000,
+    section121ExclusionSingle: 250000,
+
+    // §121 requires 2 of the last 5 years as a primary residence. If a home is
+    // converted to a rental, that rule leaves roughly a 3-year window after you
+    // stop living there in which a sale still qualifies for the full exclusion.
+    // Source: IRC §121(a)/(b) (2-of-5 use test). See spec §11.1.
+    section121UseTestWindowYears: 3
+  },
+
+  // ---- STATE tax treatment, keyed by two-letter state code -------------------
+  // Only the states relevant to this portfolio are defined (WA, CA, CO, OR).
+  // "residency" states the user can pick from are WA and CA (see userInputs.js).
+  stateTax: {
+    // WASHINGTON — no personal income tax. It DOES have a capital-gains excise
+    // tax (RCW 82.87, effective 2022), BUT real estate is explicitly EXEMPT
+    // (RCW 82.87.040). We still encode the 7% rate + exemption because it
+    // applies to OTHER (non-real-estate) gains, which a later phase may model.
+    WA: {
+      name: 'Washington',
+      type: 'capital-gains-excise',
+      rate: 0.07,                   // 7% — RCW 82.87 (base tier)
+      realEstateExempt: true,       // RCW 82.87.040 — real property gains exempt
+      standardExemption: 270000,    // ~2026 inflation-adjusted exemption (approx)
+      // NOTE: 2025 legislation added an extra tier on very large gains (>$1M).
+      // Not encoded here because real estate is exempt anyway; add if you later
+      // model non-real-estate gains.
+      taxesResidentsOnAllIncome: false // WA has no income tax at all
+    },
+
+    // CALIFORNIA — taxes capital gains as ordinary income (no special CG rate).
+    // Source: CA R&TC. Top marginal ≈ 13.3% (12.3% + 1% mental-health surcharge
+    // over $1M). Phase 1 applies the TOP marginal rate to the whole gain, which
+    // OVERSTATES tax on smaller gains — a documented simplification.
+    CA: {
+      name: 'California',
+      type: 'income',
+      rate: 0.133,                  // 13.3% top marginal (simplification)
+      capitalGainsAsOrdinaryIncome: true,
+      conformsToSection121: true,   // CA follows the federal §121 exclusion
+      taxesResidentsOnAllIncome: true, // residents taxed on income wherever earned
+      taxesNonResidentsOnSourceIncome: true, // and non-residents on CA-source income
+      // Proposition 13 caps the annual increase in a property's ASSESSED value
+      // at 2%/yr (until a change of ownership resets it to market). This is a
+      // real, transferable-only-by-loss asset — tracked separately from market
+      // value for display. Source: CA Const. Art. XIII A (Prop 13).
+      prop13AnnualAssessmentCap: 0.02
+    },
+
+    // COLORADO — flat income tax. Source: CO DOR. 4.4% (2024).
+    // Rental/real property here creates a NON-RESIDENT source filing regardless
+    // of where you live.
+    CO: {
+      name: 'Colorado',
+      type: 'income',
+      rate: 0.044,                  // 4.4% flat
+      taxesNonResidentsOnSourceIncome: true
+    },
+
+    // OREGON — graduated income tax; top ≈ 9.9%. Source: OR DOR.
+    // Also a NON-RESIDENT source-filing state for property located there.
+    OR: {
+      name: 'Oregon',
+      type: 'income',
+      rate: 0.099,                  // 9.9% top marginal (simplification)
+      taxesNonResidentsOnSourceIncome: true
+    }
+  }
+};
+
+/* ===== js/params/structuralFacts.js ===== */
+/* =============================================================================
+ *  structuralFacts.js  —  STRUCTURAL FACTS
+ * =============================================================================
+ *
+ *  Facts about the household that are stable and rarely change, but that the
+ *  tax math needs. Kept separate from tax LAW (taxParams) and from the editable
+ *  SCENARIO (userInputs) so each kind of input lives in exactly one place.
+ *
+ *  ⚠️ These values are FICTIONAL DEMO values. Set your own in the UI.
+ * ---------------------------------------------------------------------------*/
+
+window.FP = window.FP || {};
+
+FP.structuralFacts = {
+  // Filing status drives which §121 exclusion and NIIT threshold apply.
+  // Allowed: 'MFJ' (married filing jointly) or 'Single'.
+  filingStatus: 'MFJ',
+
+  // Birth years — used by later phases (retirement timing). Not required by the
+  // real-estate math, but kept here so there is a single home for such facts.
+  birthYearSelf: 1965,     // DEMO
+  birthYearSpouse: 1963,   // DEMO
+
+  // A flag so the UI can remind you these are stand-in values.
+  isPlaceholder: true
+};
+
+/* ===== js/inputs/fieldSchema.js ===== */
+/* =============================================================================
+ *  fieldSchema.js  —  describes every editable PROPERTY input
+ * =============================================================================
+ *
+ *  This is documentation that the program can read. The UI builds its edit
+ *  forms from this list, so every input box automatically gets a label, a unit,
+ *  and help text — and there is a single place that defines what each field
+ *  means. Adding a field here makes it appear in the UI.
+ *
+ *  `type` controls how the value is shown/edited:
+ *    'currency' - dollars (whole numbers)
+ *    'percent'  - stored as a DECIMAL (0.03) but shown/edited as a PERCENT (3)
+ *    'number'   - a plain number (nights, months, years)
+ *    'year'     - a 4-digit calendar year (or the word 'hold')
+ *    'date'     - an ISO date string (YYYY-MM-DD)
+ *    'text'     - free text
+ *    'select'   - one of `options`
+ *    'boolean'  - a checkbox
+ *
+ *  `tier` groups fields on screen:
+ *    1 = Basis & tax, 2 = Operating, 3 = Disposition, 0 = Identity
+ *
+ *  `showIf` (optional) names a boolean field; the row is only shown/relevant
+ *  when meaningful (the UI uses it to hide disposition fields on hold-only
+ *  properties). It is advisory — the engine ignores hidden fields on its own.
+ * ---------------------------------------------------------------------------*/
+
+window.FP = window.FP || {};
+
+FP.propertyFieldSchema = [
+  // ---- Identity (tier 0) ----
+  { key: 'name', label: 'Property name', type: 'text', tier: 0, help: 'A label you recognize.' },
+  { key: 'state', label: 'State (where property sits)', type: 'select', tier: 0,
+    options: ['CA', 'WA', 'CO', 'OR'], help: 'The SOURCE state for sale tax. Custom states added below also appear here.' },
+  { key: 'ownershipEntity', label: 'Ownership entity', type: 'select', tier: 0,
+    options: ['Individual', 'Joint Revocable Trust', 'S-Corp', 'LLC', 'Partnership'],
+    help: 'How title is held. S-Corp constrains sale options (see notes).' },
+  { key: 'entityStockBasis', label: 'Entity stock/interest basis', type: 'currency', tier: 0,
+    help: 'S-Corp only: your basis in the entity. Differs from the property inside basis; both matter at sale.' },
+
+  // ---- Tier 1 — Basis & tax ----
+  { key: 'purchasePrice', label: 'Purchase price', type: 'currency', tier: 1 },
+  { key: 'purchaseDate', label: 'Purchase date', type: 'date', tier: 1 },
+  { key: 'landAllocation', label: 'Land allocation (value)', type: 'currency', tier: 1,
+    help: 'The LAND portion of the purchase price in dollars (land is NOT depreciable).' },
+  { key: 'capitalImprovements', label: 'Capital improvements', type: 'currency', tier: 1,
+    help: 'Money spent improving the property (adds to basis).' },
+  { key: 'accumulatedDepreciation', label: 'Accumulated depreciation (taken so far)', type: 'currency', tier: 1,
+    help: 'Total depreciation already deducted. Drives 25% recapture at sale.' },
+  { key: 'annualDepreciationRate', label: 'Annual depreciation rate', type: 'percent', tier: 1,
+    help: 'e.g. residential = 1/27.5 ≈ 3.636%. Use 0% for a home not yet a rental.' },
+  { key: 'placedInServiceDate', label: 'Placed-in-service date', type: 'date', tier: 1,
+    help: 'When it first became a rental. Blank = never (no depreciation yet).' },
+  { key: 'suspendedPassiveLosses', label: 'Suspended passive losses', type: 'currency', tier: 1,
+    help: 'Form 8582 carryforward (informational in Phase 1).' },
+  // Status-change (primary → rental) inputs — used by the CA primary case.
+  { key: 'conversionYear', label: 'Primary→rental conversion year', type: 'year', tier: 1,
+    help: 'Year a primary residence becomes a rental. Leave "hold" if it never converts. Depreciation starts here.' },
+  { key: 'fmvAtConversion', label: 'FMV at conversion', type: 'currency', tier: 1,
+    help: 'Market value when it converts to a rental. Depreciation basis = LOWER of adjusted basis or this.' },
+  { key: 'prop13AssessedValue', label: 'Prop 13 assessed value (CA)', type: 'currency', tier: 1,
+    help: 'CA only. Grows at a capped 2%/yr; a real asset lost on any rebuy. Tracked separately from market value.' },
+
+  // ---- Tier 2 — Operating ----
+  { key: 'grossRentalRevenue', label: 'Gross rental revenue (annual)', type: 'currency', tier: 2,
+    help: 'Used when seasonal detail is OFF.' },
+  { key: 'marketValue', label: 'Market value (current)', type: 'currency', tier: 2 },
+  { key: 'assessedValue', label: 'Assessed value', type: 'currency', tier: 2,
+    help: 'Tax-assessed value (informational).' },
+  { key: 'propertyTax', label: 'Property tax (annual)', type: 'currency', tier: 2 },
+  { key: 'insurance', label: 'Insurance (annual)', type: 'currency', tier: 2 },
+  { key: 'hoa', label: 'HOA (annual)', type: 'currency', tier: 2 },
+  { key: 'ownerPaidUtilities', label: 'Owner-paid utilities (annual)', type: 'currency', tier: 2 },
+  { key: 'managementFees', label: 'Management fees (annual)', type: 'currency', tier: 2 },
+  { key: 'housekeepingTurnover', label: 'Housekeeping / turnover (annual)', type: 'currency', tier: 2 },
+  { key: 'routineMaintenance', label: 'Routine maintenance (annual)', type: 'currency', tier: 2 },
+  { key: 'capitalReserve', label: 'Capital reserve (flat annual)', type: 'currency', tier: 2,
+    help: 'Used only if the % field below is 0.' },
+  { key: 'capitalReservePctOfValue', label: 'Capital reserve (% of value)', type: 'percent', tier: 2,
+    help: 'Preferred: 1–2% of market value. If > 0, this overrides the flat amount above.' },
+  { key: 'vacancyAllowancePct', label: 'Vacancy allowance', type: 'percent', tier: 2,
+    help: 'Share of gross revenue lost to vacancy.' },
+  { key: 'nonResidentFilingCost', label: 'Non-resident filing cost (annual)', type: 'currency', tier: 2,
+    help: 'CO/OR etc.: accepted annual cost of a source-state filing. Counts as an operating expense.' },
+  { key: 'mortgageBalance', label: 'Mortgage balance (current)', type: 'currency', tier: 2 },
+  { key: 'mortgageRate', label: 'Mortgage rate', type: 'percent', tier: 2 },
+  { key: 'mortgageTermYears', label: 'Mortgage term (years)', type: 'number', tier: 2 },
+  { key: 'mortgageOriginationDate', label: 'Mortgage origination date', type: 'date', tier: 2 },
+
+  // ---- Tier 3 — Disposition ----
+  { key: 'holdIndefinitely', label: 'Hold indefinitely (no sale modeled)', type: 'boolean', tier: 3,
+    help: 'For family-housing holds (CO/OR). When on, no sale is modeled and the fields below are ignored.' },
+  { key: 'appreciationRate', label: 'Appreciation rate (annual)', type: 'percent', tier: 3, showIf: 'sale' },
+  { key: 'sellingCostsPct', label: 'Selling costs', type: 'percent', tier: 3, showIf: 'sale',
+    help: 'Agent + closing costs as a share of sale price (typically 6–8%).' },
+  { key: 'plannedSaleYear', label: 'Planned sale year', type: 'year', tier: 3, showIf: 'sale',
+    help: 'A calendar year to model a sale, or "hold" to never sell.' },
+  { key: 'section121Eligible', label: '§121 primary-residence exclusion applies', type: 'boolean', tier: 3, showIf: 'sale',
+    help: 'Home-sale gain exclusion. If the home converted to a rental, it must sell within the use-test window (≈3 yrs) or the exclusion is lost.' }
+];
+
+// Seasonal sub-fields (shown only when seasonal.enabled is on).
+FP.seasonalFieldSchema = [
+  { key: 'enabled', label: 'Use seasonal (short-term rental) detail', type: 'boolean' },
+  { key: 'peakNightlyRate', label: 'Peak nightly rate', type: 'currency' },
+  { key: 'peakMonths', label: 'Peak months (count)', type: 'number' },
+  { key: 'offSeasonNightlyRate', label: 'Off-season nightly rate', type: 'currency' },
+  { key: 'occupancyPct', label: 'Occupancy', type: 'percent' }
+];
+
+// The three tiers, for section headings in the UI.
+FP.tierLabels = {
+  0: 'Identity & ownership',
+  1: 'Tier 1 — Basis & tax',
+  2: 'Tier 2 — Operating',
+  3: 'Tier 3 — Disposition'
+};
+
+/* ===== js/inputs/userInputs.js ===== */
+/* =============================================================================
+ *  userInputs.js  —  DEFAULT SCENARIO (editable) + demo properties
+ * =============================================================================
+ *
+ *  This is the one file that holds the SCENARIO data (not tax law, not household
+ *  facts). Everything here is editable in the UI, and the whole object can be
+ *  saved to / loaded from a JSON file.
+ *
+ *  ⚠️ EVERY NUMBER BELOW IS FICTIONAL DEMO DATA — invented round numbers so the
+ *  app has something to show. It does NOT represent any real person or portfolio.
+ *  Enter your own figures in the UI and keep them in JSON files on your device;
+ *  never commit real financial data to this public repository.
+ *
+ *  Percentages are stored as DECIMALS here (0.03 = 3%). The UI shows them as %.
+ * ---------------------------------------------------------------------------*/
+
+window.FP = window.FP || {};
+
+FP.makeDefaultScenario = function () {
+  var START_YEAR = 2026;
+  var HORIZON = 30;
+
+  var residencyByYear = [];
+  for (var i = 0; i < HORIZON; i++) residencyByYear.push('CA'); // default all CA; editable per year
+
+  return {
+    schemaVersion: 2,
+    label: 'Sample portfolio (fictional demo data)',
+    isPlaceholder: true,
+
+    startYear: START_YEAR,
+    horizonYears: HORIZON,
+
+    assumptions: {
+      revenueGrowthRate: 0.03,      // rents grow 3%/yr (demo)
+      expenseGrowthRate: 0.03,      // operating costs grow 3%/yr (demo)
+      benchmarkMortgageRate: 0.07   // market mortgage rate, for the below-market-financing benefit
+    },
+
+    defaultResidency: 'CA',
+    residencyByYear: residencyByYear,
+
+    // User-defined extra states (source or future domicile). Merged into the
+    // state-tax table. Example: { code:'AZ', name:'Arizona', rate:0.025 }
+    customStates: [],
+
+    taxParamsVersion: '2026.1',
+
+    properties: [
+      // ---------------------------------------------------------------------
+      //  1) A home that CONVERTS from primary residence to a rental, then sells
+      //     (demonstrates the §121 use-test window and conversion depreciation)
+      // ---------------------------------------------------------------------
+      {
+        id: 'demo-ca-home', name: 'Sample Home (CA) — DEMO', state: 'CA',
+        ownershipEntity: 'Joint Revocable Trust', entityStockBasis: 0,
+        isPlaceholder: true,
+        purchasePrice: 300000, purchaseDate: '2012-05-01',
+        landAllocation: 75000, capitalImprovements: 0,
+        accumulatedDepreciation: 0, annualDepreciationRate: 0.03636, // applies AFTER conversion
+        placedInServiceDate: null, suspendedPassiveLosses: 0,
+        conversionYear: 2033, fmvAtConversion: 650000, // primary → rental in 2033
+        prop13AssessedValue: 450000,
+        grossRentalRevenue: 30000, marketValue: 600000, assessedValue: 450000,
+        propertyTax: 7000, insurance: 2000, hoa: 0, ownerPaidUtilities: 0,
+        managementFees: 0, housekeepingTurnover: 0, routineMaintenance: 3000,
+        capitalReserve: 2000, capitalReservePctOfValue: 0, vacancyAllowancePct: 0.03,
+        nonResidentFilingCost: 0,
+        mortgageBalance: 250000, mortgageRate: 0.04, mortgageTermYears: 30,
+        mortgageOriginationDate: '2019-06-01',
+        holdIndefinitely: false, appreciationRate: 0.035, sellingCostsPct: 0.06,
+        plannedSaleYear: 2035, section121Eligible: true,
+        seasonal: { enabled: false, peakNightlyRate: 0, peakMonths: 0, offSeasonNightlyRate: 0, occupancyPct: 0 },
+        notes: 'DEMO. Converts primary→rental in 2033 and sells within the ~3-year §121 window. '
+             + 'Post-conversion depreciation is recaptured and NOT sheltered by §121. Try moving the sale '
+             + 'year to 2037 to see the §121 exclusion lost.'
+      },
+
+      // ---------------------------------------------------------------------
+      //  2) A short-term rental held in an S-corp (seasonal revenue, recapture)
+      // ---------------------------------------------------------------------
+      {
+        id: 'demo-wa-str', name: 'Sample STR (WA) — DEMO', state: 'WA',
+        ownershipEntity: 'S-Corp', entityStockBasis: 300000,
+        isPlaceholder: true,
+        purchasePrice: 500000, purchaseDate: '2018-01-01',
+        landAllocation: 100000, capitalImprovements: 50000,
+        accumulatedDepreciation: 100000, annualDepreciationRate: 0.03636,
+        placedInServiceDate: '2018-01-01', suspendedPassiveLosses: 25000,
+        conversionYear: 'hold', fmvAtConversion: 0, prop13AssessedValue: 0,
+        grossRentalRevenue: 0,
+        marketValue: 1000000, assessedValue: 850000,
+        propertyTax: 9000, insurance: 3000, hoa: 0, ownerPaidUtilities: 2000,
+        managementFees: 8000, housekeepingTurnover: 4000, routineMaintenance: 3000,
+        capitalReserve: 0, capitalReservePctOfValue: 0.01, // 1% of value (STR wear)
+        vacancyAllowancePct: 0, // occupancy handles vacancy in seasonal detail
+        nonResidentFilingCost: 0,
+        mortgageBalance: 250000, mortgageRate: 0.05, mortgageTermYears: 30,
+        mortgageOriginationDate: '2018-01-01',
+        holdIndefinitely: false, appreciationRate: 0.04, sellingCostsPct: 0.06,
+        plannedSaleYear: 2033, section121Eligible: false,
+        seasonal: { enabled: true, peakNightlyRate: 400, peakMonths: 4, offSeasonNightlyRate: 150, occupancyPct: 0.60 },
+        notes: 'DEMO. Held in an S-corp — gain flows through to the personal return in the sale year; the MAGI '
+             + 'spike can be timed, not structured away. Washington exempts real estate from its capital-gains excise.'
+      },
+
+      // ---------------------------------------------------------------------
+      //  3) A single-family rental in an income-tax state, held indefinitely
+      // ---------------------------------------------------------------------
+      {
+        id: 'demo-co-rental', name: 'Sample Rental (CO) — DEMO', state: 'CO',
+        ownershipEntity: 'Individual', entityStockBasis: 0,
+        isPlaceholder: true,
+        purchasePrice: 200000, purchaseDate: '2016-04-01',
+        landAllocation: 40000, capitalImprovements: 10000,
+        accumulatedDepreciation: 50000, annualDepreciationRate: 0.03636,
+        placedInServiceDate: '2016-04-01', suspendedPassiveLosses: 0,
+        conversionYear: 'hold', fmvAtConversion: 0, prop13AssessedValue: 0,
+        grossRentalRevenue: 18000, marketValue: 260000, assessedValue: 230000,
+        propertyTax: 2200, insurance: 1000, hoa: 0, ownerPaidUtilities: 0,
+        managementFees: 1800, housekeepingTurnover: 0, routineMaintenance: 2000,
+        capitalReserve: 1500, capitalReservePctOfValue: 0, vacancyAllowancePct: 0.05,
+        nonResidentFilingCost: 400, // accepted cost of the non-resident filing
+        mortgageBalance: 150000, mortgageRate: 0.04, mortgageTermYears: 30,
+        mortgageOriginationDate: '2016-04-01',
+        holdIndefinitely: true, appreciationRate: 0.03, sellingCostsPct: 0.06,
+        plannedSaleYear: 'hold', section121Eligible: false,
+        seasonal: { enabled: false, peakNightlyRate: 0, peakMonths: 0, offSeasonNightlyRate: 0, occupancyPct: 0 },
+        notes: 'DEMO. Indefinite hold (no sale modeled). A non-resident source-state filing is an accepted cost.'
+      },
+
+      // ---------------------------------------------------------------------
+      //  4) Another indefinite-hold single-family rental in a second tax state
+      // ---------------------------------------------------------------------
+      {
+        id: 'demo-or-rental', name: 'Sample Rental (OR) — DEMO', state: 'OR',
+        ownershipEntity: 'Individual', entityStockBasis: 0,
+        isPlaceholder: true,
+        purchasePrice: 210000, purchaseDate: '2017-08-01',
+        landAllocation: 42000, capitalImprovements: 8000,
+        accumulatedDepreciation: 45000, annualDepreciationRate: 0.03636,
+        placedInServiceDate: '2017-08-01', suspendedPassiveLosses: 0,
+        conversionYear: 'hold', fmvAtConversion: 0, prop13AssessedValue: 0,
+        grossRentalRevenue: 18500, marketValue: 270000, assessedValue: 240000,
+        propertyTax: 2400, insurance: 1100, hoa: 0, ownerPaidUtilities: 0,
+        managementFees: 1850, housekeepingTurnover: 0, routineMaintenance: 2100,
+        capitalReserve: 1500, capitalReservePctOfValue: 0, vacancyAllowancePct: 0.05,
+        nonResidentFilingCost: 400, // accepted cost of the non-resident filing
+        mortgageBalance: 160000, mortgageRate: 0.0425, mortgageTermYears: 30,
+        mortgageOriginationDate: '2017-08-01',
+        holdIndefinitely: true, appreciationRate: 0.03, sellingCostsPct: 0.06,
+        plannedSaleYear: 'hold', section121Eligible: false,
+        seasonal: { enabled: false, peakNightlyRate: 0, peakMonths: 0, offSeasonNightlyRate: 0, occupancyPct: 0 },
+        notes: 'DEMO. Indefinite hold (no sale modeled). A non-resident source-state filing is an accepted cost.'
+      }
+    ]
+  };
+};
+
+/* ===== js/engine/taxInterface.js ===== */
+/* =============================================================================
+ *  taxInterface.js  —  FEDERAL TAX INTERFACE (stub implementation)
+ * =============================================================================
+ *
+ *  WHY THIS FILE EXISTS
+ *  --------------------
+ *  Federal tax on a property sale really depends on your OTHER income for the
+ *  year (which bracket you land in, whether NIIT applies, etc.). Phase 1 does
+ *  not model that yet. So we hide the federal calculation behind this small
+ *  "interface" with a clearly-labelled STUB. Later, a real federal engine (or a
+ *  Python backend) can replace ONLY this file — the sale logic in
+ *  realEstateEngine.js calls this interface and never needs to change.
+ *
+ *  This module is HEADLESS: it never touches the page (no `document`, no DOM).
+ *  It takes plain numbers in and returns plain numbers out.
+ *
+ *  Everything it returns is marked `provisional: true` so the UI can flag it.
+ * ---------------------------------------------------------------------------*/
+
+window.FP = window.FP || {};
+
+FP.taxInterface = {
+  /*
+   * computeFederalDispositionTax
+   * ----------------------------
+   * Provisional federal tax on the sale of one property.
+   *
+   * INPUTS (all dollars, already computed by the engine):
+   *   parts.taxableCapitalGain  - long-term capital gain AFTER any §121 exclusion
+   *   parts.depreciationRecapture - unrecaptured §1250 gain (taxed separately)
+   *   taxParams                 - a taxParamsYYYY object (rates live there)
+   *   structuralFacts           - filing status (for future threshold logic)
+   *
+   * RETURNS an object with a full breakdown and `provisional: true`.
+   *
+   * ASSUMPTIONS (per project decision):
+   *   - Use the TOP long-term capital-gains rate (we don't know your bracket).
+   *   - Assume you are above the NIIT threshold (top-rate assumption).
+   *   These assumptions overstate tax for many situations on purpose, so the
+   *   provisional number is a conservative ceiling, not a promise.
+   */
+  computeFederalDispositionTax: function (parts, taxParams, structuralFacts) {
+    var fed = taxParams.federal;
+
+    var capGain = Math.max(0, parts.taxableCapitalGain || 0);
+    var recapture = Math.max(0, parts.depreciationRecapture || 0);
+
+    // Long-term capital-gains tax at the assumed TOP rate.
+    var capitalGainsTax = capGain * fed.longTermTopRate;
+
+    // Depreciation recapture (unrecaptured §1250) at its own max rate (25%).
+    var recaptureTax = recapture * fed.depreciationRecaptureRate;
+
+    // Net Investment Income Tax (3.8%) on the gain, IF we assume you are above
+    // the threshold. Both the capital gain and the recapture are investment
+    // income for NIIT purposes.
+    var niitBase = capGain + recapture;
+    var niitTax = fed.assumeAboveNIITThreshold ? niitBase * fed.niitRate : 0;
+
+    var total = capitalGainsTax + recaptureTax + niitTax;
+
+    return {
+      provisional: true, // <-- the UI shows a "PROVISIONAL" badge because of this
+      assumptions: {
+        rateUsed: fed.longTermTopRate,
+        niitApplied: fed.assumeAboveNIITThreshold,
+        filingStatus: structuralFacts ? structuralFacts.filingStatus : 'unknown',
+        note: 'Federal tax assumes the top long-term rate and that NIIT applies. '
+            + 'Real bracket depends on other income, which Phase 1 does not model.'
+      },
+      breakdown: {
+        capitalGainsTax: capitalGainsTax,
+        recaptureTax: recaptureTax,
+        niitTax: niitTax
+      },
+      total: total
+    };
+  }
+};
+
+/* ===== js/engine/realEstateEngine.js ===== */
+/* =============================================================================
+ *  realEstateEngine.js  —  THE CALCULATION ENGINE (headless, no DOM)
+ * =============================================================================
+ *
+ *  This file contains ALL the real-estate math. It never touches the web page:
+ *  no `document`, no reading of input boxes. It takes a plain data object in and
+ *  returns a plain results object out — so it can be swapped for a Python
+ *  backend later. The UI is the only thing that knows about the screen.
+ *
+ *  PUBLIC ENTRY POINT:
+ *      FP.engine.runProjection(scenario, taxParams, structuralFacts, taxInterface)
+ *
+ *  KEY DEFINITIONS:
+ *    - Adjusted cost basis = purchase price + capital improvements
+ *                            − accumulated depreciation.  (DERIVED, never typed.)
+ *    - NOI = effective revenue − operating expenses, BEFORE debt service.
+ *    - Cash flow = NOI − annual mortgage P&I.
+ *    - Equity = market value − mortgage balance.
+ *    - Return on equity = cash flow ÷ equity.  (Headline metric.)
+ *    - On sale, gain splits into CAPITAL GAIN and DEPRECIATION RECAPTURE,
+ *      taxed differently; §121 can exclude capital gain (never recapture) and
+ *      is lost if a converted rental sells outside the use-test window.
+ * ---------------------------------------------------------------------------*/
+
+window.FP = window.FP || {};
+
+FP.engine = (function () {
+  'use strict';
+
+  function num(x) { return (typeof x === 'number' && isFinite(x)) ? x : 0; }
+  function grow(base, r, years) { return num(base) * Math.pow(1 + num(r), years); }
+  function yearNum(v) { return (v && v !== 'hold') ? Number(v) : null; }
+
+  var DAYS_PER_MONTH = 30.42; // 365 / 12, documented constant (not a magic number)
+
+  // ---------------------------------------------------------------------------
+  //  MORTGAGE AMORTIZATION — year-by-year interest / principal / ending balance
+  //  from the CURRENT balance, rate, and remaining term.
+  // ---------------------------------------------------------------------------
+  function buildAmortization(currentBalance, annualRate, remainingTermYears, horizonYears) {
+    var schedule = [];
+    var balance = num(currentBalance);
+    var monthlyRate = num(annualRate) / 12;
+    var monthsLeft = Math.max(0, Math.round(num(remainingTermYears) * 12));
+
+    var monthlyPayment;
+    if (balance <= 0 || monthsLeft <= 0) monthlyPayment = 0;
+    else if (monthlyRate === 0) monthlyPayment = balance / monthsLeft;
+    else monthlyPayment = balance * monthlyRate / (1 - Math.pow(1 + monthlyRate, -monthsLeft));
+
+    var monthCounter = 0;
+    for (var t = 0; t < horizonYears; t++) {
+      var yi = 0, yp = 0, ypay = 0;
+      for (var mo = 0; mo < 12; mo++) {
+        if (monthCounter >= monthsLeft || balance <= 0.005) break;
+        var interest = balance * monthlyRate;
+        var principal = monthlyPayment - interest;
+        if (principal > balance) principal = balance;
+        balance -= principal;
+        yi += interest; yp += principal; ypay += (interest + principal);
+        monthCounter++;
+      }
+      schedule.push({ interest: yi, principal: yp, payment: ypay, endingBalance: Math.max(0, balance) });
+    }
+    return schedule;
+  }
+
+  // ---------------------------------------------------------------------------
+  //  GROSS RENTAL REVENUE — flat annual, or built from seasonal STR detail.
+  // ---------------------------------------------------------------------------
+  function baseGrossRevenue(p) {
+    if (p.seasonal && p.seasonal.enabled) {
+      var s = p.seasonal, occ = num(s.occupancyPct);
+      var peakNights = num(s.peakMonths) * DAYS_PER_MONTH;
+      var offNights = (12 - num(s.peakMonths)) * DAYS_PER_MONTH;
+      return num(s.peakNightlyRate) * peakNights * occ + num(s.offSeasonNightlyRate) * offNights * occ;
+    }
+    return num(p.grossRentalRevenue);
+  }
+
+  // ---------------------------------------------------------------------------
+  //  DEPRECIATION SETUP
+  //  Two cases:
+  //   (a) Already a rental: placed-in-service date set, seed accumulated
+  //       depreciation given; depreciable basis = purchase − land + improvements.
+  //   (b) Primary→rental CONVERSION: depreciation starts at the conversion year
+  //       on the LOWER of adjusted basis or FMV at conversion, net of land, and
+  //       recapture on it is NOT sheltered by §121.
+  //   Land value is given in dollars; we convert to a fraction to strip land out
+  //   of the FMV-at-conversion figure too.
+  // ---------------------------------------------------------------------------
+  function depreciationPlan(p, startYear) {
+    var landFraction = num(p.purchasePrice) > 0 ? num(p.landAllocation) / num(p.purchasePrice) : 0;
+    var conv = yearNum(p.conversionYear);
+    var rate = num(p.annualDepreciationRate);
+
+    if (conv !== null) {
+      // Conversion case. Adjusted basis at conversion (no prior depreciation on a
+      // personal residence). Depreciable basis = lower of that or FMV, minus land.
+      var adjBasisAtConv = num(p.purchasePrice) + num(p.capitalImprovements);
+      var lower = Math.min(adjBasisAtConv, num(p.fmvAtConversion) || adjBasisAtConv);
+      var deprBasis = lower * (1 - landFraction);
+      return { inServiceStartYear: conv, depreciableBasisCap: deprBasis,
+               annualDepreciation: rate * deprBasis, converted: true, conversionYear: conv };
+    }
+
+    var placed = p.placedInServiceDate ? new Date(p.placedInServiceDate).getFullYear() : null;
+    if (placed !== null && rate > 0) {
+      var stdBasis = num(p.purchasePrice) - num(p.landAllocation) + num(p.capitalImprovements);
+      return { inServiceStartYear: Math.min(placed, startYear), depreciableBasisCap: stdBasis,
+               annualDepreciation: rate * stdBasis, converted: false, conversionYear: null };
+    }
+    return { inServiceStartYear: null, depreciableBasisCap: 0, annualDepreciation: 0,
+             converted: false, conversionYear: null };
+  }
+
+  // ---------------------------------------------------------------------------
+  //  OPERATING EXPENSES for one year.
+  //  capitalReservePctOfValue (if > 0) overrides the flat capitalReserve.
+  //  nonResidentFilingCost is an accepted annual cost (CO/OR source filings).
+  // ---------------------------------------------------------------------------
+  function operatingExpenseLines(p, growthFactor, marketValue) {
+    var capReserve = num(p.capitalReservePctOfValue) > 0
+      ? marketValue * num(p.capitalReservePctOfValue)
+      : num(p.capitalReserve) * growthFactor;
+    return {
+      propertyTax: num(p.propertyTax) * growthFactor,
+      insurance: num(p.insurance) * growthFactor,
+      hoa: num(p.hoa) * growthFactor,
+      ownerPaidUtilities: num(p.ownerPaidUtilities) * growthFactor,
+      managementFees: num(p.managementFees) * growthFactor,
+      housekeepingTurnover: num(p.housekeepingTurnover) * growthFactor,
+      routineMaintenance: num(p.routineMaintenance) * growthFactor,
+      capitalReserve: capReserve,
+      nonResidentFilingCost: num(p.nonResidentFilingCost) * growthFactor
+    };
+  }
+  function sumLines(lines) { var t = 0; for (var k in lines) if (lines.hasOwnProperty(k)) t += lines[k]; return t; }
+
+  // ---------------------------------------------------------------------------
+  //  STATE TAX for a single state on a real-property gain.
+  //  Reads the merged state table (base + any custom states).
+  // ---------------------------------------------------------------------------
+  function stateTaxForOneState(stateCode, taxableGain, isRealEstate, stateTable) {
+    var cfg = stateTable[stateCode];
+    if (!cfg) return { state: stateCode, tax: 0, note: 'no rule defined for ' + stateCode };
+    if (cfg.type === 'capital-gains-excise') {
+      if (isRealEstate && cfg.realEstateExempt) return { state: stateCode, tax: 0, note: 'WA excise exempts real estate' };
+      var over = Math.max(0, taxableGain - num(cfg.standardExemption));
+      return { state: stateCode, tax: over * cfg.rate, note: 'WA excise (non-real-estate)' };
+    }
+    return { state: stateCode, tax: Math.max(0, taxableGain) * cfg.rate, note: (cfg.name || stateCode) + ' income tax' };
+  }
+
+  // ---------------------------------------------------------------------------
+  //  DISPOSITION (a modeled sale).
+  // ---------------------------------------------------------------------------
+  function computeDisposition(p, ctx) {
+    var tp = ctx.taxParams;
+    var salePrice = ctx.marketValueAtSale;
+    var sellingCosts = salePrice * num(p.sellingCostsPct);
+    var amountRealized = salePrice - sellingCosts;
+
+    var adjustedBasis = num(p.purchasePrice) + num(p.capitalImprovements) - ctx.accumulatedDepreciationAtSale;
+    var totalGain = amountRealized - adjustedBasis;
+
+    // Recapture (unrecaptured §1250) = depreciation taken, capped at the gain.
+    var recapture = Math.max(0, Math.min(ctx.accumulatedDepreciationAtSale, totalGain));
+    var rawCapitalGain = totalGain - recapture;
+
+    // ---- §121 exclusion + use-test window ----
+    var filing = ctx.filingStatus;
+    var exclusionCap = (filing === 'Single') ? tp.federal.section121ExclusionSingle : tp.federal.section121ExclusionMFJ;
+    var windowYears = num(tp.federal.section121UseTestWindowYears);
+    var conv = yearNum(p.conversionYear);
+    var section121Lost = false, section121Exclusion = 0, section121Note = '';
+    if (p.section121Eligible) {
+      if (conv !== null && ctx.saleYear > conv + windowYears) {
+        // Converted to a rental and sold too late — exclusion forfeited.
+        section121Lost = true;
+        section121Note = 'Sale in ' + ctx.saleYear + ' is beyond the §121 use-test window (converted '
+          + conv + ' + ' + windowYears + ' yrs = ' + (conv + windowYears)
+          + '). Exclusion LOST — taxable gain rises accordingly.';
+      } else {
+        section121Exclusion = Math.min(exclusionCap, Math.max(0, rawCapitalGain));
+        section121Note = (conv !== null)
+          ? 'Within the §121 use-test window (converted ' + conv + '; must sell by ' + (conv + windowYears) + ').'
+          : 'Primary-residence exclusion applied.';
+      }
+    }
+    var taxableCapitalGain = Math.max(0, rawCapitalGain - section121Exclusion);
+
+    // ---- Federal (provisional, via the swappable interface) ----
+    var federal = ctx.taxInterface.computeFederalDispositionTax(
+      { taxableCapitalGain: taxableCapitalGain, depreciationRecapture: recapture }, tp, ctx.structuralFacts);
+
+    // ---- State (source vs resident, no double-count) ----
+    var stateTaxableGain = Math.max(0, totalGain - section121Exclusion); // CA conforms to §121
+    var sourceState = p.state, residentState = ctx.residentState;
+    var sourceR = stateTaxForOneState(sourceState, stateTaxableGain, true, ctx.stateTable);
+    var residentR = stateTaxForOneState(residentState, stateTaxableGain, true, ctx.stateTable);
+    var stateTotal, stateExplanation, creditApplied = 0;
+    if (sourceState === residentState) {
+      stateTotal = sourceR.tax;
+      stateExplanation = 'Property state and residence are the same (' + sourceState + '); taxed once.';
+    } else {
+      stateTotal = Math.max(sourceR.tax, residentR.tax);
+      creditApplied = Math.min(sourceR.tax, residentR.tax);
+      stateExplanation = 'Source ' + sourceState + ' ($' + Math.round(sourceR.tax) + ') and resident '
+        + residentState + ' ($' + Math.round(residentR.tax) + '): resident credits the source tax, so you pay the higher.';
+    }
+
+    // ---- S-corp representation (attorney-verified in a later phase) ----
+    var sCorp = null;
+    if (p.ownershipEntity === 'S-Corp') {
+      sCorp = {
+        entityStockBasis: num(p.entityStockBasis),
+        propertyInsideBasis: adjustedBasis,
+        stockVsInsideDelta: adjustedBasis - num(p.entityStockBasis),
+        note: 'Held in an S-corp: gain is recognized at the entity and passes through to the personal '
+            + 'return in the sale year (the MAGI spike cannot be structured away — only timed). Stock basis '
+            + 'vs property inside basis changes the true after-tax result and must be verified by a tax attorney '
+            + '(also check built-in-gains exposure if ever a C-corp).'
+      };
+    }
+
+    var mortgagePayoff = ctx.mortgageBalanceAtSale;
+    var netBeforeTax = salePrice - sellingCosts - mortgagePayoff;
+    var totalTax = federal.total + stateTotal;
+
+    return {
+      sold: true, saleYear: ctx.saleYear,
+      salePrice: salePrice, sellingCosts: sellingCosts, amountRealized: amountRealized,
+      adjustedBasis: adjustedBasis, accumulatedDepreciation: ctx.accumulatedDepreciationAtSale,
+      totalGain: totalGain, depreciationRecapture: recapture, rawCapitalGain: rawCapitalGain,
+      section121Eligible: !!p.section121Eligible, section121Exclusion: section121Exclusion,
+      section121Lost: section121Lost, section121Note: section121Note,
+      taxableCapitalGain: taxableCapitalGain,
+      federal: federal,
+      state: { sourceState: sourceState, residentState: residentState, sourceTax: sourceR.tax,
+               residentTax: residentR.tax, creditApplied: creditApplied, total: stateTotal, explanation: stateExplanation },
+      sCorp: sCorp,
+      mortgagePayoff: mortgagePayoff, totalTax: totalTax,
+      netBeforeTax: netBeforeTax, netAfterTax: netBeforeTax - totalTax,
+      provisional: true
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  //  PROJECT ONE PROPERTY across the horizon.
+  // ---------------------------------------------------------------------------
+  function projectProperty(p, scenario, taxParams, structuralFacts, taxInterface, stateTable) {
+    var startYear = scenario.startYear, horizon = scenario.horizonYears, a = scenario.assumptions;
+
+    var originationYear = p.mortgageOriginationDate ? new Date(p.mortgageOriginationDate).getFullYear() : startYear;
+    var remainingTerm = Math.max(0, num(p.mortgageTermYears) - Math.max(0, startYear - originationYear));
+    var amort = buildAmortization(p.mortgageBalance, p.mortgageRate, remainingTerm, horizon);
+
+    var dep = depreciationPlan(p, startYear);
+    var accumulatedDepreciation = num(p.accumulatedDepreciation);
+
+    var baseRevenue = baseGrossRevenue(p);
+    var conv = yearNum(p.conversionYear);
+    // Hold-indefinitely properties never model a sale.
+    var saleYear = p.holdIndefinitely ? null : yearNum(p.plannedSaleYear);
+
+    var prop13Cap = (taxParams.stateTax.CA && taxParams.stateTax.CA.prop13AnnualAssessmentCap) || 0;
+    var benchmarkRate = num(a.benchmarkMortgageRate);
+
+    var rows = [], disposition = null, soldOff = false;
+
+    for (var t = 0; t < horizon; t++) {
+      var calYear = startYear + t;
+      var mort = amort[t] || { interest: 0, principal: 0, payment: 0, endingBalance: 0 };
+      var marketValue = grow(p.marketValue, p.appreciationRate, t);
+
+      if (soldOff) { rows.push(emptyRowAfterSale(calYear, t)); continue; }
+
+      // Depreciation this year (only once in service, and only up to the cap).
+      var thisYearDepr = 0;
+      if (dep.inServiceStartYear !== null && calYear >= dep.inServiceStartYear
+          && accumulatedDepreciation < dep.depreciableBasisCap) {
+        thisYearDepr = Math.min(dep.annualDepreciation, dep.depreciableBasisCap - accumulatedDepreciation);
+      }
+
+      // Sale this year? Compute BEFORE advancing depreciation (recapture uses
+      // depreciation taken through the prior year plus this year's is added after).
+      if (saleYear === calYear) {
+        disposition = computeDisposition(p, {
+          saleYear: calYear,
+          marketValueAtSale: marketValue,
+          mortgageBalanceAtSale: (t > 0 ? amort[t - 1].endingBalance : num(p.mortgageBalance)),
+          accumulatedDepreciationAtSale: accumulatedDepreciation,
+          residentState: residencyForYear(scenario, t),
+          taxParams: taxParams, structuralFacts: structuralFacts, taxInterface: taxInterface,
+          filingStatus: structuralFacts.filingStatus, stateTable: stateTable
+        });
+      }
+
+      // Rental revenue is zero before a primary→rental conversion.
+      var rentalActive = (conv === null) || (calYear >= conv);
+      var revenueFactor = Math.pow(1 + num(a.revenueGrowthRate), t);
+      var expenseFactor = Math.pow(1 + num(a.expenseGrowthRate), t);
+
+      var grossRevenue = rentalActive ? baseRevenue * revenueFactor : 0;
+      var vacancyLoss = grossRevenue * num(p.vacancyAllowancePct);
+      var effectiveRevenue = grossRevenue - vacancyLoss;
+
+      var expLines = operatingExpenseLines(p, expenseFactor, marketValue);
+      var totalOpex = sumLines(expLines);
+
+      var noi = effectiveRevenue - totalOpex;
+      var annualPI = mort.payment;
+      var cashFlow = noi - annualPI;
+      var equity = marketValue - mort.endingBalance;
+      var returnOnEquity = (equity !== 0) ? cashFlow / equity : null;
+
+      // Prop 13 assessed value (informational): capped-growth series.
+      var prop13 = num(p.prop13AssessedValue) > 0 ? num(p.prop13AssessedValue) * Math.pow(1 + prop13Cap, t) : 0;
+      // Below-market financing benefit (informational).
+      var belowMarketAnnual = Math.max(0, mort.endingBalance * (benchmarkRate - num(p.mortgageRate)));
+
+      accumulatedDepreciation += thisYearDepr;
+
+      rows.push({
+        year: calYear, t: t,
+        marketValue: marketValue, mortgageBalance: mort.endingBalance, equity: equity,
+        grossRevenue: grossRevenue, vacancyLoss: vacancyLoss, effectiveRevenue: effectiveRevenue,
+        rentalActive: rentalActive, expenseLines: expLines, totalOperatingExpenses: totalOpex,
+        noi: noi, annualPI: annualPI, mortgageInterest: mort.interest, mortgagePrincipal: mort.principal,
+        cashFlow: cashFlow, returnOnEquity: returnOnEquity,
+        annualDepreciation: thisYearDepr, accumulatedDepreciation: accumulatedDepreciation,
+        adjustedCostBasis: num(p.purchasePrice) + num(p.capitalImprovements) - accumulatedDepreciation,
+        prop13AssessedValue: prop13, belowMarketFinancingAnnual: belowMarketAnnual,
+        sold: false
+      });
+
+      if (saleYear === calYear) {
+        rows[rows.length - 1].sold = true;
+        rows[rows.length - 1].disposition = disposition;
+        soldOff = true;
+      }
+    }
+
+    return {
+      id: p.id, name: p.name, state: p.state, ownershipEntity: p.ownershipEntity,
+      holdIndefinitely: !!p.holdIndefinitely, converted: dep.converted, conversionYear: dep.conversionYear,
+      isPlaceholder: !!p.isPlaceholder, rows: rows, disposition: disposition
+    };
+  }
+
+  function residencyForYear(scenario, t) {
+    var r = scenario.residencyByYear;
+    if (Array.isArray(r) && r[t]) return r[t];
+    return scenario.defaultResidency || 'CA';
+  }
+
+  function emptyRowAfterSale(calYear, t) {
+    return { year: calYear, t: t, sold: true, alreadySold: true,
+      marketValue: 0, mortgageBalance: 0, equity: 0, grossRevenue: 0, vacancyLoss: 0, effectiveRevenue: 0,
+      expenseLines: {}, totalOperatingExpenses: 0, noi: 0, annualPI: 0, mortgageInterest: 0, mortgagePrincipal: 0,
+      cashFlow: 0, returnOnEquity: null, annualDepreciation: 0, accumulatedDepreciation: 0, adjustedCostBasis: 0,
+      prop13AssessedValue: 0, belowMarketFinancingAnnual: 0 };
+  }
+
+  // Merge base state table with any user-defined custom states.
+  function buildStateTable(taxParams, scenario) {
+    var table = {};
+    for (var k in taxParams.stateTax) if (taxParams.stateTax.hasOwnProperty(k)) table[k] = taxParams.stateTax[k];
+    (scenario.customStates || []).forEach(function (s) {
+      if (!s || !s.code) return;
+      table[s.code] = { name: s.name || s.code, type: 'income', rate: num(s.rate), taxesNonResidentsOnSourceIncome: true };
+    });
+    return table;
+  }
+
+  // ---------------------------------------------------------------------------
+  //  RUN THE WHOLE PORTFOLIO.  Public entry point.
+  // ---------------------------------------------------------------------------
+  function runProjection(scenario, taxParams, structuralFacts, taxInterface) {
+    var horizon = scenario.horizonYears, startYear = scenario.startYear;
+    var stateTable = buildStateTable(taxParams, scenario);
+
+    var properties = scenario.properties.map(function (p) {
+      return projectProperty(p, scenario, taxParams, structuralFacts, taxInterface, stateTable);
+    });
+
+    var portfolio = [], cumulativeSaleProceeds = 0;
+    for (var t = 0; t < horizon; t++) {
+      var tot = { year: startYear + t, t: t, marketValue: 0, mortgageBalance: 0, equity: 0,
+                  noi: 0, cashFlow: 0, grossRevenue: 0, saleProceedsThisYear: 0 };
+      properties.forEach(function (proj) {
+        var row = proj.rows[t]; if (!row) return;
+        tot.marketValue += num(row.marketValue); tot.mortgageBalance += num(row.mortgageBalance);
+        tot.equity += num(row.equity); tot.noi += num(row.noi); tot.cashFlow += num(row.cashFlow);
+        tot.grossRevenue += num(row.grossRevenue);
+        if (row.sold && row.disposition) tot.saleProceedsThisYear += num(row.disposition.netAfterTax);
+      });
+      cumulativeSaleProceeds += tot.saleProceedsThisYear;
+      tot.cumulativeSaleProceeds = cumulativeSaleProceeds;
+      tot.totalRealEstateWealth = tot.equity + cumulativeSaleProceeds;
+      tot.returnOnEquity = (tot.equity !== 0) ? tot.cashFlow / tot.equity : null;
+      portfolio.push(tot);
+    }
+
+    return {
+      meta: { startYear: startYear, horizonYears: horizon, taxParamsVersion: taxParams.meta.version, anyProvisional: true },
+      properties: properties, portfolio: portfolio
+    };
+  }
+
+  return { runProjection: runProjection, _buildAmortization: buildAmortization, _computeDisposition: computeDisposition };
+})();
+
+/* ===== js/ui/format.js ===== */
+/* =============================================================================
+ *  format.js  —  number formatting helpers for the UI
+ * =============================================================================
+ *  Small, dependency-free helpers to turn raw numbers into readable strings.
+ *  These are display-only; they never affect calculations.
+ * ---------------------------------------------------------------------------*/
+
+window.FP = window.FP || {};
+
+FP.fmt = {
+  // Whole-dollar currency, e.g. 1234567 -> "$1,234,567". Negatives in ( ).
+  money: function (x) {
+    if (x === null || x === undefined || isNaN(x)) return '—';
+    var n = Math.round(x);
+    var neg = n < 0;
+    var s = Math.abs(n).toLocaleString('en-US');
+    return neg ? '($' + s + ')' : '$' + s;
+  },
+
+  // Percent from a DECIMAL, e.g. 0.0364 -> "3.6%".
+  pct: function (x, digits) {
+    if (x === null || x === undefined || isNaN(x)) return '—';
+    var d = (digits === undefined) ? 1 : digits;
+    return (x * 100).toFixed(d) + '%';
+  },
+
+  // Return-on-equity can be null (no equity). Show 1 decimal percent.
+  roe: function (x) {
+    if (x === null || x === undefined || isNaN(x)) return '—';
+    return (x * 100).toFixed(1) + '%';
+  },
+
+  // A plain number with no decimals.
+  int: function (x) {
+    if (x === null || x === undefined || isNaN(x)) return '—';
+    return Math.round(x).toLocaleString('en-US');
+  }
+};
+
+/* ===== js/ui/charts.js ===== */
+/* =============================================================================
+ *  charts.js  —  tiny inline-SVG line charts (NO external libraries)
+ * =============================================================================
+ *  Draws simple multi-series line charts as SVG markup strings. The UI drops
+ *  the returned string into the page. SVG scales cleanly on a tablet because we
+ *  use a viewBox and let CSS size the width to 100%.
+ *
+ *  Usage:
+ *    FP.charts.lineChart({
+ *      series: [{ name:'CA-Primary', color:'#3b6', points:[{x:2026,y:500000}, ...] }],
+ *      yFormat: FP.fmt.money,   // how to label the Y axis
+ *      title: 'Market value'
+ *    })  ->  "<svg ...>...</svg>"
+ * ---------------------------------------------------------------------------*/
+
+window.FP = window.FP || {};
+
+FP.charts = (function () {
+  'use strict';
+
+  // A colour-blind-friendly palette (used in order). Documented, not magic.
+  var PALETTE = ['#2f7ed8', '#e07b39', '#3aab5c', '#a052c0', '#d24b6a', '#7f8c8d'];
+
+  function niceMax(v) {
+    if (v <= 0) return 1;
+    var pow = Math.pow(10, Math.floor(Math.log10(v)));
+    var f = v / pow;
+    var nice = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
+    return nice * pow;
+  }
+
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+
+  function lineChart(cfg) {
+    var series = cfg.series || [];
+    var yFormat = cfg.yFormat || FP.fmt.int;
+
+    // Drawing area in SVG user units (viewBox coordinates).
+    var W = 720, H = 360;
+    var padL = 84, padR = 16, padT = 16, padB = 44;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+
+    // Collect x (years) and y ranges across all series.
+    var allX = [], minY = 0, maxY = 0;
+    series.forEach(function (s) {
+      s.points.forEach(function (pt) {
+        if (allX.indexOf(pt.x) === -1) allX.push(pt.x);
+        if (pt.y < minY) minY = pt.y;
+        if (pt.y > maxY) maxY = pt.y;
+      });
+    });
+    allX.sort(function (a, b) { return a - b; });
+    if (allX.length === 0) return '<svg viewBox="0 0 ' + W + ' ' + H + '"></svg>';
+
+    var xMin = allX[0], xMax = allX[allX.length - 1];
+    var yTop = niceMax(maxY);
+    var yBot = minY < 0 ? -niceMax(-minY) : 0;
+
+    function sx(x) { return padL + (xMax === xMin ? 0 : (x - xMin) / (xMax - xMin) * plotW); }
+    function sy(y) { return padT + (yTop === yBot ? 0 : (yTop - y) / (yTop - yBot) * plotH); }
+
+    var svg = [];
+    svg.push('<svg viewBox="0 0 ' + W + ' ' + H + '" class="fp-chart" '
+      + 'xmlns="http://www.w3.org/2000/svg" role="img" aria-label="' + esc(cfg.title || 'chart') + '">');
+
+    // Horizontal gridlines + Y labels (5 steps).
+    var steps = 5;
+    for (var i = 0; i <= steps; i++) {
+      var yVal = yBot + (yTop - yBot) * i / steps;
+      var y = sy(yVal);
+      svg.push('<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y
+        + '" class="fp-grid"/>');
+      svg.push('<text x="' + (padL - 8) + '" y="' + (y + 4) + '" class="fp-axislabel" '
+        + 'text-anchor="end">' + esc(yFormat(yVal)) + '</text>');
+    }
+
+    // Zero baseline emphasized if range crosses zero.
+    if (yBot < 0) {
+      var y0 = sy(0);
+      svg.push('<line x1="' + padL + '" y1="' + y0 + '" x2="' + (W - padR) + '" y2="' + y0
+        + '" class="fp-zero"/>');
+    }
+
+    // X labels (about 6 evenly spaced years).
+    var xStep = Math.max(1, Math.round(allX.length / 6));
+    for (var j = 0; j < allX.length; j += xStep) {
+      var xv = allX[j];
+      svg.push('<text x="' + sx(xv) + '" y="' + (H - padB + 20) + '" class="fp-axislabel" '
+        + 'text-anchor="middle">' + xv + '</text>');
+    }
+
+    // Each series as a polyline.
+    series.forEach(function (s, idx) {
+      var color = s.color || PALETTE[idx % PALETTE.length];
+      var pts = s.points.slice().sort(function (a, b) { return a.x - b.x; })
+        .map(function (pt) { return sx(pt.x) + ',' + sy(pt.y); }).join(' ');
+      svg.push('<polyline points="' + pts + '" fill="none" stroke="' + color
+        + '" stroke-width="2.5" />');
+    });
+
+    svg.push('</svg>');
+
+    // Legend as HTML chips (outside the SVG so text stays crisp).
+    var legend = '<div class="fp-legend">' + series.map(function (s, idx) {
+      var color = s.color || PALETTE[idx % PALETTE.length];
+      return '<span class="fp-legend-item"><span class="fp-swatch" style="background:'
+        + color + '"></span>' + esc(s.name) + '</span>';
+    }).join('') + '</div>';
+
+    var titleHtml = cfg.title ? '<div class="fp-chart-title">' + esc(cfg.title) + '</div>' : '';
+    return titleHtml + '<div class="fp-chart-wrap">' + svg.join('') + '</div>' + legend;
+  }
+
+  return { lineChart: lineChart, PALETTE: PALETTE };
+})();
+
+/* ===== js/ui/tables.js ===== */
+/* =============================================================================
+ *  tables.js  —  builds the numeric output tables (HTML strings)
+ * =============================================================================
+ *  Turns the engine's results object into HTML tables. Wrapped in a scrolling
+ *  container so wide tables scroll sideways instead of breaking the layout on a
+ *  tablet.
+ * ---------------------------------------------------------------------------*/
+
+window.FP = window.FP || {};
+
+FP.tables = (function () {
+  'use strict';
+  var m = function (x) { return FP.fmt.money(x); };
+  var roe = function (x) { return FP.fmt.roe(x); };
+
+  function scroll(inner) { return '<div class="fp-tablescroll">' + inner + '</div>'; }
+
+  // Per-property year-by-year table.
+  function propertyTable(proj) {
+    var head = '<tr><th>Year</th><th>Market value</th><th>Mortgage</th><th>Equity</th>'
+      + '<th>NOI</th><th>P&amp;I</th><th>Cash flow</th><th>Return on equity</th>'
+      + '<th>Accum. deprec.</th><th>Adj. basis</th></tr>';
+    var body = proj.rows.map(function (r) {
+      if (r.alreadySold) {
+        return '<tr class="fp-sold-row"><td>' + r.year + '</td>'
+          + '<td colspan="9">— sold —</td></tr>';
+      }
+      var soldTag = r.sold ? ' <span class="fp-badge fp-badge-sale">SOLD</span>' : '';
+      return '<tr>'
+        + '<td>' + r.year + soldTag + '</td>'
+        + '<td>' + m(r.marketValue) + '</td>'
+        + '<td>' + m(r.mortgageBalance) + '</td>'
+        + '<td>' + m(r.equity) + '</td>'
+        + '<td>' + m(r.noi) + '</td>'
+        + '<td>' + m(r.annualPI) + '</td>'
+        + '<td class="' + (r.cashFlow < 0 ? 'fp-neg' : 'fp-pos') + '">' + m(r.cashFlow) + '</td>'
+        + '<td>' + roe(r.returnOnEquity) + '</td>'
+        + '<td>' + m(r.accumulatedDepreciation) + '</td>'
+        + '<td>' + m(r.adjustedCostBasis) + '</td>'
+        + '</tr>';
+    }).join('');
+    return scroll('<table class="fp-table">' + head + body + '</table>');
+  }
+
+  // Portfolio totals table.
+  function portfolioTable(portfolio) {
+    var head = '<tr><th>Year</th><th>Total value</th><th>Total mortgage</th>'
+      + '<th>Total equity</th><th>Total NOI</th><th>Total cash flow</th>'
+      + '<th>Sale proceeds (after-tax)</th><th>RE wealth (equity + sales)</th></tr>';
+    var body = portfolio.map(function (r) {
+      return '<tr>'
+        + '<td>' + r.year + '</td>'
+        + '<td>' + m(r.marketValue) + '</td>'
+        + '<td>' + m(r.mortgageBalance) + '</td>'
+        + '<td>' + m(r.equity) + '</td>'
+        + '<td>' + m(r.noi) + '</td>'
+        + '<td class="' + (r.cashFlow < 0 ? 'fp-neg' : 'fp-pos') + '">' + m(r.cashFlow) + '</td>'
+        + '<td>' + (r.saleProceedsThisYear ? m(r.saleProceedsThisYear) : '—') + '</td>'
+        + '<td>' + m(r.totalRealEstateWealth) + '</td>'
+        + '</tr>';
+    }).join('');
+    return scroll('<table class="fp-table">' + head + body + '</table>');
+  }
+
+  // Sale-year tax detail for a single disposition.
+  function dispositionDetail(name, d) {
+    if (!d) return '';
+    var f = d.federal;
+    var rows = [
+      ['Sale price', m(d.salePrice)],
+      ['Selling costs', m(-d.sellingCosts)],
+      ['Amount realized', m(d.amountRealized)],
+      ['Adjusted cost basis', m(d.adjustedBasis)],
+      ['— of which accumulated depreciation', m(d.accumulatedDepreciation)],
+      ['TOTAL GAIN', m(d.totalGain)],
+      ['Depreciation recapture (taxed ≤25%, NOT sheltered by §121)', m(d.depreciationRecapture)],
+      ['Capital gain (before §121)', m(d.rawCapitalGain)],
+      ['§121 exclusion applied', d.section121Eligible ? m(-d.section121Exclusion) : 'n/a'],
+      ['Taxable capital gain', m(d.taxableCapitalGain)]
+    ];
+    var federalRows = [
+      ['Federal capital-gains tax', m(f.breakdown.capitalGainsTax)],
+      ['Federal recapture tax (25%)', m(f.breakdown.recaptureTax)],
+      ['Federal NIIT (3.8%)', m(f.breakdown.niitTax)],
+      ['Federal total (PROVISIONAL)', m(f.total)]
+    ];
+    var stateRows = [
+      ['Source state (' + d.state.sourceState + ') tax', m(d.state.sourceTax)],
+      ['Resident state (' + d.state.residentState + ') tax', m(d.state.residentTax)],
+      ['Credit applied (no double tax)', m(d.state.creditApplied)],
+      ['State total', m(d.state.total)]
+    ];
+    var proceeds = [
+      ['Net before tax (price − costs − payoff)', m(d.netBeforeTax)],
+      ['Mortgage payoff', m(-d.mortgagePayoff)],
+      ['Total tax (federal + state)', m(-d.totalTax)],
+      ['NET AFTER-TAX PROCEEDS', m(d.netAfterTax)]
+    ];
+
+    function block(title, arr, cls) {
+      return '<div class="fp-detail-block ' + (cls || '') + '"><h4>' + title + '</h4>'
+        + '<table class="fp-kv">' + arr.map(function (kv) {
+            return '<tr><td>' + kv[0] + '</td><td class="fp-num">' + kv[1] + '</td></tr>';
+          }).join('') + '</table></div>';
+    }
+
+    // §121 window note (warning if the exclusion was lost).
+    var s121 = '';
+    if (d.section121Note) {
+      s121 = '<p class="' + (d.section121Lost ? 'fp-warning' : 'fp-muted') + '">'
+        + (d.section121Lost ? '⚠️ §121 LOST — ' : '§121: ') + d.section121Note + '</p>';
+    }
+    // S-corp pass-through note.
+    var sCorp = '';
+    if (d.sCorp) {
+      sCorp = '<div class="fp-detail-block"><h4>S-corp ownership</h4>'
+        + '<table class="fp-kv">'
+        + '<tr><td>Property inside basis</td><td class="fp-num">' + m(d.sCorp.propertyInsideBasis) + '</td></tr>'
+        + '<tr><td>Entity stock basis</td><td class="fp-num">' + m(d.sCorp.entityStockBasis) + '</td></tr>'
+        + '<tr><td>Inside − stock basis delta</td><td class="fp-num">' + m(d.sCorp.stockVsInsideDelta) + '</td></tr>'
+        + '</table><p class="fp-muted">' + d.sCorp.note + '</p></div>';
+    }
+
+    return '<div class="fp-disposition">'
+      + '<h3>' + name + ' — sale in ' + d.saleYear + '</h3>'
+      + '<p class="fp-provisional-note">⚠️ Federal tax is <strong>PROVISIONAL</strong>: '
+      + f.assumptions.note + '</p>'
+      + s121
+      + '<div class="fp-detail-grid">'
+      + block('Gain breakdown', rows)
+      + block('Federal (provisional)', federalRows, 'fp-provisional')
+      + block('State — ' + d.state.explanation, stateRows)
+      + block('Net proceeds', proceeds)
+      + sCorp
+      + '</div></div>';
+  }
+
+  return {
+    propertyTable: propertyTable,
+    portfolioTable: portfolioTable,
+    dispositionDetail: dispositionDetail
+  };
+})();
+
+/* ===== js/ui/app.js ===== */
+/* =============================================================================
+ *  app.js  —  THE USER INTERFACE (the only file that touches the page)
+ * =============================================================================
+ *  Responsibilities:
+ *    - hold the current scenario (your editable data),
+ *    - build the input controls from the field schema,
+ *    - call the headless engine and render tables + charts on every change,
+ *    - save/load the scenario as a JSON file you download / upload.
+ *
+ *  The engine (realEstateEngine.js) never runs anything here — this file calls
+ *  INTO it. That separation is what lets a Python backend replace the engine
+ *  later without rewriting the screen.
+ *
+ *  NOTE: We deliberately do NOT use localStorage/sessionStorage (they are
+ *  unreliable in this setup). Persistence is via JSON file download/upload.
+ * ---------------------------------------------------------------------------*/
+
+(function () {
+  'use strict';
+
+  // ----- application state ---------------------------------------------------
+  var scenario = FP.makeDefaultScenario(); // start from the placeholder portfolio
+
+  // Map a tax-params version string to the actual parameter object.
+  function getTaxParams() {
+    // Only 2026 exists today; extend this when you add taxParams2027.js etc.
+    return FP.taxParams2026;
+  }
+
+  // The state codes a property can sit in: the four built-ins plus any the user
+  // has defined in the Custom states section.
+  function allStateCodes() {
+    var base = ['CA', 'WA', 'CO', 'OR'];
+    (scenario.customStates || []).forEach(function (s) {
+      if (s && s.code && base.indexOf(s.code) === -1) base.push(s.code);
+    });
+    return base;
+  }
+  // Residency can be WA or CA (spec §8), plus any custom state (a future domicile).
+  function residencyOptions() {
+    var base = ['WA', 'CA'];
+    (scenario.customStates || []).forEach(function (s) {
+      if (s && s.code && base.indexOf(s.code) === -1) base.push(s.code);
+    });
+    return base;
+  }
+
+  // ----- small DOM helpers ---------------------------------------------------
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    if (attrs) for (var k in attrs) {
+      if (k === 'class') node.className = attrs[k];
+      else if (k === 'html') node.innerHTML = attrs[k];
+      else node.setAttribute(k, attrs[k]);
+    }
+    (children || []).forEach(function (c) {
+      node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+    });
+    return node;
+  }
+  function byId(id) { return document.getElementById(id); }
+  function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+
+  // Debounce so we don't recompute on every keystroke frame.
+  var recalcTimer = null;
+  function scheduleRecalc() {
+    clearTimeout(recalcTimer);
+    recalcTimer = setTimeout(refreshOutputs, 120);
+  }
+
+  // ----- build one editable field bound to an object -------------------------
+  // Percentages are stored as decimals but shown/edited as percents.
+  function makeField(obj, item) {
+    var id = 'f_' + Math.random().toString(36).slice(2);
+    var input;
+
+    if (item.type === 'boolean') {
+      input = el('input', { type: 'checkbox', id: id });
+      input.checked = !!obj[item.key];
+      input.addEventListener('change', function () {
+        obj[item.key] = input.checked; scheduleRecalc();
+      });
+    } else if (item.type === 'select') {
+      input = el('select', { id: id });
+      item.options.forEach(function (opt) {
+        var o = el('option', { value: opt }, [opt]);
+        if (obj[item.key] === opt) o.selected = true;
+        input.appendChild(o);
+      });
+      input.addEventListener('change', function () {
+        obj[item.key] = input.value; scheduleRecalc();
+      });
+    } else {
+      var isPct = item.type === 'percent';
+      var isNumeric = ['currency', 'percent', 'number'].indexOf(item.type) !== -1;
+      var shown = obj[item.key];
+      if (isPct && typeof shown === 'number') shown = +(shown * 100).toFixed(4);
+      if (shown === null || shown === undefined) shown = '';
+      input = el('input', {
+        type: isNumeric ? 'number' : 'text', id: id, value: shown,
+        step: isPct ? '0.001' : 'any', inputmode: isNumeric ? 'decimal' : 'text'
+      });
+      input.addEventListener('input', function () {
+        var v = input.value;
+        if (item.type === 'year') {
+          obj[item.key] = (v === '' || v === 'hold') ? 'hold' : Number(v);
+        } else if (isNumeric) {
+          var n = parseFloat(v);
+          obj[item.key] = isNaN(n) ? 0 : (isPct ? n / 100 : n);
+        } else {
+          obj[item.key] = v;
+        }
+        scheduleRecalc();
+      });
+    }
+
+    var unit = item.type === 'percent' ? ' (%)' : item.type === 'currency' ? ' ($)' : '';
+    var label = el('label', { for: id, class: 'fp-field' }, [
+      el('span', { class: 'fp-field-label' }, [item.label + unit]),
+      input
+    ]);
+    if (item.help) label.appendChild(el('span', { class: 'fp-field-help' }, [item.help]));
+    return label;
+  }
+
+  // ----- build the property editor cards -------------------------------------
+  function buildPropertyEditors() {
+    var wrap = byId('propertyEditors');
+    clear(wrap);
+
+    scenario.properties.forEach(function (p, idx) {
+      var card = el('div', { class: 'fp-card' });
+      var header = el('div', { class: 'fp-card-head' }, [
+        el('h3', {}, [p.name || ('Property ' + (idx + 1))]),
+        p.isPlaceholder ? el('span', { class: 'fp-badge fp-badge-ph' }, ['PLACEHOLDER']) : el('span'),
+        el('button', { class: 'fp-btn fp-btn-danger', type: 'button' }, ['Remove'])
+      ]);
+      header.querySelector('button').addEventListener('click', function () {
+        scenario.properties.splice(idx, 1);
+        buildPropertyEditors(); scheduleRecalc();
+      });
+      card.appendChild(header);
+
+      // Group fields by tier.
+      [0, 1, 2, 3].forEach(function (tier) {
+        var fields = FP.propertyFieldSchema.filter(function (f) { return f.tier === tier; });
+        // Hold-indefinitely properties model no sale, so hide the sale fields.
+        if (tier === 3 && p.holdIndefinitely) {
+          fields = fields.filter(function (f) { return f.showIf !== 'sale'; });
+        }
+        if (!fields.length) return;
+        card.appendChild(el('h4', { class: 'fp-tier' }, [FP.tierLabels[tier]]));
+        var grid = el('div', { class: 'fp-fieldgrid' });
+        fields.forEach(function (f) {
+          // The property's state can be any built-in or custom state.
+          var item = (f.key === 'state') ? Object.assign({}, f, { options: allStateCodes() }) : f;
+          var fieldEl = makeField(p, item);
+          grid.appendChild(fieldEl);
+          // Toggling hold-indefinitely shows/hides the sale fields — rebuild.
+          if (f.key === 'holdIndefinitely') {
+            fieldEl.querySelector('input').addEventListener('change', function () { buildPropertyEditors(); });
+          }
+        });
+        card.appendChild(grid);
+
+        // Seasonal sub-block sits under Tier 2.
+        if (tier === 2) {
+          card.appendChild(el('h4', { class: 'fp-tier' }, ['Seasonal (short-term rental) detail']));
+          var sgrid = el('div', { class: 'fp-fieldgrid' });
+          FP.seasonalFieldSchema.forEach(function (f) { sgrid.appendChild(makeField(p.seasonal, f)); });
+          card.appendChild(sgrid);
+        }
+      });
+
+      if (p.notes) card.appendChild(el('p', { class: 'fp-notes' }, ['Note: ' + p.notes]));
+      wrap.appendChild(card);
+    });
+  }
+
+  // ----- build global settings + residency editor ----------------------------
+  function buildGlobalControls() {
+    var g = byId('globalControls');
+    clear(g);
+
+    // Horizon.
+    var horizon = makeField(scenario, { key: 'horizonYears', label: 'Projection horizon', type: 'number',
+      help: 'Number of years to project (default 30).' });
+    // Rebuild residency + recompute when horizon changes.
+    horizon.querySelector('input').addEventListener('change', function () {
+      resizeResidency(); buildResidencyEditor(); buildPropertyEditors(); scheduleRecalc();
+    });
+    g.appendChild(horizon);
+
+    g.appendChild(makeField(scenario, { key: 'startYear', label: 'Start year', type: 'number' }));
+    g.appendChild(makeField(scenario.assumptions, { key: 'revenueGrowthRate', label: 'Revenue growth', type: 'percent' }));
+    g.appendChild(makeField(scenario.assumptions, { key: 'expenseGrowthRate', label: 'Expense growth', type: 'percent' }));
+  }
+
+  function resizeResidency() {
+    var want = Math.max(1, Math.round(scenario.horizonYears));
+    var arr = scenario.residencyByYear.slice(0, want);
+    while (arr.length < want) arr.push(scenario.defaultResidency || 'CA');
+    scenario.residencyByYear = arr;
+  }
+
+  function buildResidencyEditor() {
+    var host = byId('residencyEditor');
+    clear(host);
+
+    var controls = el('div', { class: 'fp-residency-controls' }, [
+      el('span', {}, ['Set all years to: ']),
+      el('button', { class: 'fp-btn', type: 'button' }, ['WA']),
+      el('button', { class: 'fp-btn', type: 'button' }, ['CA'])
+    ]);
+    var btns = controls.querySelectorAll('button');
+    btns[0].addEventListener('click', function () { setAllResidency('WA'); });
+    btns[1].addEventListener('click', function () { setAllResidency('CA'); });
+    host.appendChild(controls);
+
+    var grid = el('div', { class: 'fp-residency-grid' });
+    scenario.residencyByYear.forEach(function (r, t) {
+      var year = scenario.startYear + t;
+      var sel = el('select', {});
+      residencyOptions().forEach(function (opt) {
+        var o = el('option', { value: opt }, [opt]);
+        if (r === opt) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', function () {
+        scenario.residencyByYear[t] = sel.value; scheduleRecalc();
+      });
+      grid.appendChild(el('label', { class: 'fp-residency-cell' }, [
+        el('span', {}, [String(year)]), sel
+      ]));
+    });
+    host.appendChild(grid);
+  }
+
+  function setAllResidency(state) {
+    for (var t = 0; t < scenario.residencyByYear.length; t++) scenario.residencyByYear[t] = state;
+    buildResidencyEditor(); scheduleRecalc();
+  }
+
+  // ----- custom (pluggable) states -------------------------------------------
+  // Add a source state or a future domicile with its own income-tax rate. These
+  // merge into the state-tax table and appear in the state / residency pickers.
+  function buildCustomStates() {
+    var host = byId('customStatesEditor');
+    if (!host) return;
+    clear(host);
+    if (!scenario.customStates) scenario.customStates = [];
+
+    scenario.customStates.forEach(function (s, idx) {
+      var row = el('div', { class: 'fp-fieldgrid fp-customstate' });
+      row.appendChild(makeField(s, { key: 'code', label: 'Code (e.g. AZ)', type: 'text' }));
+      row.appendChild(makeField(s, { key: 'name', label: 'Name', type: 'text' }));
+      row.appendChild(makeField(s, { key: 'rate', label: 'Income-tax rate', type: 'percent' }));
+      var rm = el('button', { class: 'fp-btn fp-btn-danger', type: 'button' }, ['Remove']);
+      rm.addEventListener('click', function () {
+        scenario.customStates.splice(idx, 1);
+        buildCustomStates(); buildResidencyEditor(); buildPropertyEditors(); scheduleRecalc();
+      });
+      row.appendChild(el('label', { class: 'fp-field' }, [el('span', { class: 'fp-field-label' }, [' ']), rm]));
+      // Changing a code changes which options exist elsewhere — rebuild pickers.
+      row.querySelectorAll('input').forEach(function (inp) {
+        inp.addEventListener('change', function () { buildResidencyEditor(); buildPropertyEditors(); });
+      });
+      host.appendChild(row);
+    });
+  }
+
+  // ----- compute + render outputs --------------------------------------------
+  function seriesPerProperty(result, field) {
+    return result.properties.map(function (proj, idx) {
+      return {
+        name: proj.name,
+        color: FP.charts.PALETTE[idx % FP.charts.PALETTE.length],
+        points: proj.rows.filter(function (r) { return r[field] !== null && !r.alreadySold; })
+          .map(function (r) { return { x: r.year, y: r[field] }; })
+      };
+    });
+  }
+  function portfolioSeries(result, field, name, color) {
+    return { name: name, color: color,
+      points: result.portfolio.map(function (r) { return { x: r.year, y: r[field] }; }) };
+  }
+
+  function refreshOutputs() {
+    var result = FP.engine.runProjection(scenario, getTaxParams(), FP.structuralFacts, FP.taxInterface);
+
+    // Headline metric cards (current year = year 1).
+    var cards = byId('summaryCards');
+    clear(cards);
+    var y0 = result.portfolio[0];
+    cards.appendChild(metricCard('Total equity (year 1)', FP.fmt.money(y0.equity)));
+    cards.appendChild(metricCard('Total value (year 1)', FP.fmt.money(y0.marketValue)));
+    cards.appendChild(metricCard('Total NOI (year 1)', FP.fmt.money(y0.noi), true));
+    cards.appendChild(metricCard('Total cash flow (year 1)', FP.fmt.money(y0.cashFlow)));
+    cards.appendChild(metricCard('Portfolio return on equity', FP.fmt.roe(y0.returnOnEquity), true));
+
+    // Per-property headline row — NOI and ROE are the two decision metrics.
+    var propCards = byId('propertyMetricCards');
+    clear(propCards);
+    result.properties.forEach(function (proj, idx) {
+      var r0 = proj.rows[0];
+      var line = 'NOI ' + FP.fmt.money(r0.noi) + ' · ROE ' + FP.fmt.roe(r0.returnOnEquity)
+        + ' · CF ' + FP.fmt.money(r0.cashFlow);
+      if (r0.belowMarketFinancingAnnual > 0) {
+        line += ' · below-mkt financing ~' + FP.fmt.money(r0.belowMarketFinancingAnnual) + '/yr';
+      }
+      var c = metricCard(proj.name + (proj.holdIndefinitely ? ' (hold)' : ''), line);
+      c.style.borderTopColor = FP.charts.PALETTE[idx % FP.charts.PALETTE.length];
+      propCards.appendChild(c);
+    });
+
+    // Charts.
+    var charts = byId('charts');
+    clear(charts);
+    charts.appendChild(chartBlock(FP.charts.lineChart({
+      title: 'Market value by property', yFormat: FP.fmt.money,
+      series: seriesPerProperty(result, 'marketValue') })));
+    charts.appendChild(chartBlock(FP.charts.lineChart({
+      title: 'Equity by property', yFormat: FP.fmt.money,
+      series: seriesPerProperty(result, 'equity') })));
+    charts.appendChild(chartBlock(FP.charts.lineChart({
+      title: 'Cash flow by property', yFormat: FP.fmt.money,
+      series: seriesPerProperty(result, 'cashFlow') })));
+    charts.appendChild(chartBlock(FP.charts.lineChart({
+      title: 'NOI by property', yFormat: FP.fmt.money,
+      series: seriesPerProperty(result, 'noi') })));
+    charts.appendChild(chartBlock(FP.charts.lineChart({
+      title: 'Return on equity by property', yFormat: function (v) { return (v * 100).toFixed(0) + '%'; },
+      series: seriesPerProperty(result, 'returnOnEquity') })));
+    charts.appendChild(chartBlock(FP.charts.lineChart({
+      title: 'Portfolio totals', yFormat: FP.fmt.money,
+      series: [
+        portfolioSeries(result, 'marketValue', 'Total value', FP.charts.PALETTE[0]),
+        portfolioSeries(result, 'equity', 'Total equity', FP.charts.PALETTE[2]),
+        portfolioSeries(result, 'totalRealEstateWealth', 'RE wealth (equity + sales)', FP.charts.PALETTE[3])
+      ] })));
+
+    // Tables.
+    var pt = byId('portfolioTable');
+    clear(pt); pt.innerHTML = FP.tables.portfolioTable(result.portfolio);
+
+    var propTables = byId('propertyTables');
+    clear(propTables);
+    result.properties.forEach(function (proj) {
+      var details = el('details', { class: 'fp-details' });
+      details.appendChild(el('summary', {}, [proj.name + ' — yearly detail']));
+      var box = el('div');
+      box.innerHTML = FP.tables.propertyTable(proj);
+      details.appendChild(box);
+      propTables.appendChild(details);
+    });
+
+    // Disposition (sale-year tax) details.
+    var disp = byId('dispositions');
+    clear(disp);
+    var anySale = false;
+    result.properties.forEach(function (proj) {
+      if (proj.disposition) {
+        anySale = true;
+        var box = el('div');
+        box.innerHTML = FP.tables.dispositionDetail(proj.name, proj.disposition);
+        disp.appendChild(box);
+      }
+    });
+    if (!anySale) disp.appendChild(el('p', { class: 'fp-muted' }, ['No sales modeled in the horizon. Set a "Planned sale year" on a property to see sale-year tax detail.']));
+  }
+
+  function metricCard(label, value, highlight) {
+    return el('div', { class: 'fp-metric' + (highlight ? ' fp-metric-hi' : '') }, [
+      el('div', { class: 'fp-metric-value' }, [value]),
+      el('div', { class: 'fp-metric-label' }, [label])
+    ]);
+  }
+  function chartBlock(html) {
+    var d = el('div', { class: 'fp-chartcard' }); d.innerHTML = html; return d;
+  }
+
+  // ----- save / load / reset -------------------------------------------------
+  function saveScenario() {
+    var data = JSON.stringify(scenario, null, 2);
+    var blob = new Blob([data], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = el('a', { href: url, download: 'real-estate-scenario.json' });
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+  function loadScenario(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var obj = JSON.parse(reader.result);
+        if (!obj.properties) throw new Error('Not a scenario file.');
+        scenario = obj;
+        if (!scenario.residencyByYear) { scenario.residencyByYear = []; resizeResidency(); }
+        if (!scenario.customStates) scenario.customStates = [];
+        if (!scenario.assumptions) scenario.assumptions = {};
+        rebuildEverything();
+      } catch (e) {
+        alert('Could not load that file: ' + e.message);
+      }
+    };
+    reader.readAsText(file);
+  }
+  function resetScenario() {
+    scenario = FP.makeDefaultScenario();
+    rebuildEverything();
+  }
+
+  function rebuildEverything() {
+    buildGlobalControls();
+    buildResidencyEditor();
+    buildCustomStates();
+    buildPropertyEditors();
+    refreshOutputs();
+  }
+
+  // ----- wire up the page ----------------------------------------------------
+  function init() {
+    byId('btnSave').addEventListener('click', saveScenario);
+    byId('btnReset').addEventListener('click', resetScenario);
+    byId('fileLoad').addEventListener('change', function (e) {
+      if (e.target.files && e.target.files[0]) loadScenario(e.target.files[0]);
+      e.target.value = '';
+    });
+    byId('btnAddProperty').addEventListener('click', function () {
+      var p = FP.makeDefaultScenario().properties[2]; // clone a simple rental
+      p = JSON.parse(JSON.stringify(p));
+      p.id = 'prop-' + Date.now();
+      p.name = 'New property';
+      scenario.properties.push(p);
+      buildPropertyEditors(); scheduleRecalc();
+    });
+    var addState = byId('btnAddState');
+    if (addState) addState.addEventListener('click', function () {
+      if (!scenario.customStates) scenario.customStates = [];
+      scenario.customStates.push({ code: '', name: '', rate: 0.05 });
+      buildCustomStates();
+    });
+    rebuildEverything();
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+})();
+
+  </script>
+</body>
+</html>
