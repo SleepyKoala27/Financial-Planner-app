@@ -90,10 +90,16 @@ FP.tables = (function () {
       ['Credit applied (no double tax)', m(d.state.creditApplied)],
       ['State total', m(d.state.total)]
     ];
+    var tt = d.transferTax || { total: 0, statePortion: 0, propertyPortion: 0, note: '' };
+    var transferRows = [
+      [(tt.stateCode || d.state.sourceState) + ' transfer/excise tax (on sale price)', m(tt.statePortion)],
+      ['Property-level (city/local) transfer tax', m(tt.propertyPortion)],
+      ['Transfer tax total', m(tt.total)]
+    ];
     var proceeds = [
       ['Net before tax (price − costs − payoff)', m(d.netBeforeTax)],
       ['Mortgage payoff', m(-d.mortgagePayoff)],
-      ['Total tax (federal + state)', m(-d.totalTax)],
+      ['Total tax (federal + state + transfer)', m(-d.totalTax)],
       ['NET AFTER-TAX PROCEEDS', m(d.netAfterTax)]
     ];
 
@@ -129,7 +135,8 @@ FP.tables = (function () {
       + '<div class="fp-detail-grid">'
       + block('Gain breakdown', rows)
       + block('Federal (provisional)', federalRows, 'fp-provisional')
-      + block('State — ' + d.state.explanation, stateRows)
+      + block('State income tax — ' + d.state.explanation, stateRows)
+      + block('Transfer / excise tax — ' + (tt.note || 'source-state tax on sale price; no resident credit'), transferRows)
       + block('Net proceeds', proceeds)
       + sCorp
       + '</div></div>';

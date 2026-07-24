@@ -153,6 +153,55 @@ FP.engine = (function () {
   }
 
   // ---------------------------------------------------------------------------
+  //  REAL-ESTATE TRANSFER / EXCISE TAX on a sale.
+  //  Charged on the SALE PRICE (not the gain), by the state where the property
+  //  sits (SOURCE state) — the resident-state credit never applies to it.
+  //  A property's own `transferTaxRate` (a decimal, e.g. a city tax like LA's
+  //  Measure ULA) is ADDED on top of the state/county rate.
+  //  Reads taxParams.transferTax (dated + sourced in the params file).
+  // ---------------------------------------------------------------------------
+  function computeTransferTax(salePrice, stateCode, property, taxParams) {
+    var table = (taxParams && taxParams.transferTax) || {};
+    var cfg = table[stateCode];
+    var price = Math.max(0, num(salePrice));
+
+    var statePortion = 0, note;
+    if (!cfg) {
+      statePortion = price * num(table.defaultRate);
+      note = 'No transfer-tax rule for ' + stateCode + '; default ' + (num(table.defaultRate) * 100) + '%.';
+    } else if (cfg.type === 'graduated') {
+      // Marginal graduated schedule (e.g. WA REET) + a flat local add-on.
+      var lower = 0, graduated = 0;
+      (cfg.brackets || []).forEach(function (b) {
+        var ceil = (b.upTo === null || b.upTo === undefined) ? Infinity : b.upTo;
+        if (price > lower) graduated += (Math.min(price, ceil) - lower) * num(b.rate);
+        lower = ceil;
+      });
+      var local = price * num(cfg.localAddOnRate);
+      statePortion = graduated + local;
+      note = (cfg.name || stateCode) + ' (graduated'
+        + (num(cfg.localAddOnRate) > 0 ? ' + ' + (num(cfg.localAddOnRate) * 100) + '% local' : '') + ').';
+    } else {
+      // Flat state/county rate.
+      statePortion = price * num(cfg.rate);
+      note = (cfg.name || stateCode) + ' (' + (num(cfg.rate) * 100) + '%).';
+    }
+
+    // Per-property city/local override, added on top of the state/county rate.
+    var propRate = num(property && property.transferTaxRate);
+    var propertyPortion = price * propRate;
+    if (propRate > 0) note += ' Plus property-level ' + (propRate * 100) + '% (local/city).';
+
+    return {
+      total: statePortion + propertyPortion,
+      statePortion: statePortion,
+      propertyPortion: propertyPortion,
+      stateCode: stateCode,
+      note: note
+    };
+  }
+
+  // ---------------------------------------------------------------------------
   //  DISPOSITION (a modeled sale).
   // ---------------------------------------------------------------------------
   function computeDisposition(p, ctx) {
@@ -224,9 +273,14 @@ FP.engine = (function () {
       };
     }
 
+    // ---- Real-estate transfer / excise tax (source-state; on the sale price) ----
+    // Its own disposition line, separate from federal, state income tax, and
+    // selling costs. No resident-state credit applies (it is a source-state tax).
+    var transferTax = computeTransferTax(salePrice, sourceState, p, tp);
+
     var mortgagePayoff = ctx.mortgageBalanceAtSale;
     var netBeforeTax = salePrice - sellingCosts - mortgagePayoff;
-    var totalTax = federal.total + stateTotal;
+    var totalTax = federal.total + stateTotal + transferTax.total;
 
     return {
       sold: true, saleYear: ctx.saleYear,
@@ -239,6 +293,7 @@ FP.engine = (function () {
       federal: federal,
       state: { sourceState: sourceState, residentState: residentState, sourceTax: sourceR.tax,
                residentTax: residentR.tax, creditApplied: creditApplied, total: stateTotal, explanation: stateExplanation },
+      transferTax: transferTax,
       sCorp: sCorp,
       mortgagePayoff: mortgagePayoff, totalTax: totalTax,
       netBeforeTax: netBeforeTax, netAfterTax: netBeforeTax - totalTax,

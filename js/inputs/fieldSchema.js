@@ -93,6 +93,8 @@ FP.propertyFieldSchema = [
   { key: 'appreciationRate', label: 'Appreciation rate (annual)', type: 'percent', tier: 3, showIf: 'sale' },
   { key: 'sellingCostsPct', label: 'Selling costs', type: 'percent', tier: 3, showIf: 'sale',
     help: 'Agent + closing costs as a share of sale price (typically 6–8%).' },
+  { key: 'transferTaxRate', label: 'Extra local/city transfer tax', type: 'percent', tier: 3,
+    help: 'CITY or local real-estate transfer tax (e.g. LA Measure ULA), added ON TOP of the built-in state/county rate. Leave 0 if none. State rules (WA REET, CA county, etc.) apply automatically.' },
   { key: 'plannedSaleYear', label: 'Planned sale year', type: 'year', tier: 3, showIf: 'sale',
     help: 'A calendar year to model a sale, or "hold" to never sell.' },
   { key: 'section121Eligible', label: '§121 primary-residence exclusion applies', type: 'boolean', tier: 3, showIf: 'sale',

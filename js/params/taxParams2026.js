@@ -123,5 +123,75 @@ FP.taxParams2026 = {
       rate: 0.099,                  // 9.9% top marginal (simplification)
       taxesNonResidentsOnSourceIncome: true
     }
+  },
+
+  // ---- REAL-ESTATE TRANSFER / EXCISE taxes, keyed by state code --------------
+  //  These are levied on the SALE PRICE of the property (NOT on the gain, and
+  //  NOT the same thing as "selling costs %"). They are a SOURCE-STATE tax: they
+  //  depend only on where the property sits, never on the seller's residency, so
+  //  the resident-state credit logic does NOT apply to them.
+  //
+  //  A property may ALSO set its own `transferTaxRate` (a decimal) to capture a
+  //  CITY/local tax that this table can't know in advance (e.g. Los Angeles
+  //  "Measure ULA"). That per-property rate is ADDED on top of the state/county
+  //  rate below. See realEstateEngine.computeTransferTax.
+  transferTax: {
+    // WASHINGTON — Real Estate Excise Tax (REET). GRADUATED on the sale price,
+    // charged marginally by bracket. Source: RCW 82.45 / WAC 458-61A. The state
+    // graduated rates + thresholds below are effective 2023-01-01 through
+    // 2026-12-31 (thresholds are CPI-adjusted; verify at each new tax year).
+    // https://dor.wa.gov/taxes-rates/other-taxes/real-estate-excise-tax
+    WA: {
+      name: 'Washington REET',
+      type: 'graduated',
+      // Marginal brackets: `rate` applies to the portion of sale price up to
+      // `upTo` (null = no ceiling, i.e. the top bracket).
+      brackets: [
+        { upTo: 525000,  rate: 0.0110 },  // 1.10% on the first $525,000
+        { upTo: 1525000, rate: 0.0128 },  // 1.28% on $525,000–$1,525,000
+        { upTo: 3025000, rate: 0.0275 },  // 2.75% on $1,525,000–$3,025,000
+        { upTo: null,    rate: 0.0300 }   // 3.00% above $3,025,000
+      ],
+      // LOCAL REET add-on (RCW 82.46): counties/cities may levy up to ~0.50%
+      // combined (0.25% first quarter + 0.25% second quarter under GMA). Applied
+      // as a flat rate on the whole sale price. Parameterized — adjust per county.
+      localAddOnRate: 0.0050,           // 0.50% common combined local REET
+      effectiveThroughYear: 2026,
+      source: 'RCW 82.45/82.46; WA DOR graduated REET, thresholds eff. 2023-01-01..2026-12-31'
+    },
+
+    // CALIFORNIA — NO statewide transfer tax. Counties levy a documentary
+    // transfer tax of $1.10 per $1,000 = 0.11%. Some CITIES add steep taxes
+    // (e.g. LA "Measure ULA" 4–5.5% over high thresholds) — capture those with a
+    // per-property `transferTaxRate`, not here. Source: CA R&TC §11911.
+    CA: {
+      name: 'CA county documentary transfer tax',
+      type: 'flat',
+      rate: 0.0011,                     // 0.11% county documentary ($1.10/$1,000)
+      source: 'CA R&TC §11911 — $1.10 per $1,000 county documentary transfer tax'
+    },
+
+    // OREGON — essentially NONE. ORS 306.815 bars new real-estate transfer taxes;
+    // only Washington County has a grandfathered ~0.1% tax. Default 0; set a
+    // per-property `transferTaxRate` for a Washington County property.
+    OR: {
+      name: 'Oregon (no statewide transfer tax)',
+      type: 'flat',
+      rate: 0.0,
+      source: 'ORS 306.815 prohibits transfer taxes; Washington County ~0.1% grandfathered'
+    },
+
+    // COLORADO — NO statewide transfer tax (CO Const. Art. X §3 bars them). A few
+    // resort towns levy local "transfer assessments"; capture those per-property.
+    CO: {
+      name: 'Colorado (no statewide transfer tax)',
+      type: 'flat',
+      rate: 0.0,
+      source: 'CO Const. Art. X §3 — statewide transfer taxes barred; resort-town assessments only'
+    },
+
+    // Fallback for any state without a rule above (including custom states):
+    // charge nothing unless the property sets its own transferTaxRate.
+    defaultRate: 0.0
   }
 };
