@@ -377,6 +377,28 @@ FP.engine = (function () {
 
       accumulatedDepreciation += thisYearDepr;
 
+      // B3: theoretical COST OF DIVESTITURE if this property were sold THIS year,
+      // computed for every year (even hold-only) so the owner can see it. Per the
+      // owner's decision this is the FULL cost: selling costs + transfer/excise
+      // tax + capital-gains/recapture (income) tax — i.e. selling costs plus the
+      // whole tax bill of a sale. It reuses the same disposition math as a modeled
+      // sale. For the actual sale year we reuse the real `disposition` so the
+      // columns agree with the sale-year tax detail below.
+      var theo = (saleYear === calYear && disposition)
+        ? disposition
+        : computeDisposition(p, {
+            saleYear: calYear,
+            marketValueAtSale: marketValue,
+            mortgageBalanceAtSale: mort.endingBalance,
+            accumulatedDepreciationAtSale: accumulatedDepreciation,
+            residentState: residencyForYear(scenario, t),
+            taxParams: taxParams, structuralFacts: structuralFacts, taxInterface: taxInterface,
+            filingStatus: structuralFacts.filingStatus, stateTable: stateTable
+          });
+      // totalTax already includes federal + state income tax + transfer tax.
+      var salesCost = num(theo.sellingCosts) + num(theo.totalTax);
+      var netEquity = equity - salesCost;
+
       rows.push({
         year: calYear, t: t,
         marketValue: marketValue, mortgageBalance: mort.endingBalance, equity: equity,
@@ -387,6 +409,7 @@ FP.engine = (function () {
         annualDepreciation: thisYearDepr, accumulatedDepreciation: accumulatedDepreciation,
         adjustedCostBasis: num(p.purchasePrice) + num(p.capitalImprovements) - accumulatedDepreciation,
         prop13AssessedValue: prop13, belowMarketFinancingAnnual: belowMarketAnnual,
+        salesCost: salesCost, netEquity: netEquity,
         sold: false
       });
 
@@ -415,7 +438,7 @@ FP.engine = (function () {
       marketValue: 0, mortgageBalance: 0, equity: 0, grossRevenue: 0, vacancyLoss: 0, effectiveRevenue: 0,
       expenseLines: {}, totalOperatingExpenses: 0, noi: 0, annualPI: 0, mortgageInterest: 0, mortgagePrincipal: 0,
       cashFlow: 0, returnOnEquity: null, annualDepreciation: 0, accumulatedDepreciation: 0, adjustedCostBasis: 0,
-      prop13AssessedValue: 0, belowMarketFinancingAnnual: 0 };
+      prop13AssessedValue: 0, belowMarketFinancingAnnual: 0, salesCost: null, netEquity: null };
   }
 
   // Merge base state table with any user-defined custom states.

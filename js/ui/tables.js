@@ -17,13 +17,18 @@ FP.tables = (function () {
 
   // Per-property year-by-year table.
   function propertyTable(proj) {
+    // "Sales cost" and "Net equity" are the theoretical cost of selling that year
+    // (selling costs + transfer tax + capital-gains/recapture tax) and the equity
+    // left after paying it. Shown for every year, including hold-only properties.
     var head = '<tr><th>Year</th><th>Market value</th><th>Mortgage</th><th>Equity</th>'
+      + '<th title="If sold this year: selling costs + transfer tax + capital-gains/recapture tax">Sales cost (if sold)</th>'
+      + '<th title="Equity minus the theoretical sales cost">Net equity</th>'
       + '<th>NOI</th><th>P&amp;I</th><th>Cash flow</th><th>Return on equity</th>'
       + '<th>Accum. deprec.</th><th>Adj. basis</th></tr>';
     var body = proj.rows.map(function (r) {
       if (r.alreadySold) {
         return '<tr class="fp-sold-row"><td>' + r.year + '</td>'
-          + '<td colspan="9">— sold —</td></tr>';
+          + '<td colspan="11">— sold —</td></tr>';
       }
       var soldTag = r.sold ? ' <span class="fp-badge fp-badge-sale">SOLD</span>' : '';
       return '<tr>'
@@ -31,6 +36,8 @@ FP.tables = (function () {
         + '<td>' + m(r.marketValue) + '</td>'
         + '<td>' + m(r.mortgageBalance) + '</td>'
         + '<td>' + m(r.equity) + '</td>'
+        + '<td>' + m(r.salesCost) + '</td>'
+        + '<td>' + m(r.netEquity) + '</td>'
         + '<td>' + m(r.noi) + '</td>'
         + '<td>' + m(r.annualPI) + '</td>'
         + '<td class="' + (r.cashFlow < 0 ? 'fp-neg' : 'fp-pos') + '">' + m(r.cashFlow) + '</td>'
