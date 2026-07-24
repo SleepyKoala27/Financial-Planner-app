@@ -434,8 +434,30 @@
     refreshOutputs();
   }
 
+  // ----- tabs ----------------------------------------------------------------
+  // Plain CSS/JS tabs: clicking a tab button shows its panel and hides the rest.
+  // No libraries; the whole app is already loaded, so switching is instant.
+  function setupTabs() {
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('.fp-tab'));
+    function show(name) {
+      tabs.forEach(function (btn) {
+        var selected = btn.getAttribute('data-tab') === name;
+        btn.setAttribute('aria-selected', selected ? 'true' : 'false');
+        var panel = byId('panel-' + btn.getAttribute('data-tab'));
+        if (panel) panel.hidden = !selected;
+      });
+      // Scroll back to the top of the content when switching tabs (nice on iPad).
+      if (window.scrollTo) window.scrollTo(0, 0);
+    }
+    tabs.forEach(function (btn) {
+      btn.addEventListener('click', function () { show(btn.getAttribute('data-tab')); });
+    });
+    show('dashboard'); // default landing tab
+  }
+
   // ----- wire up the page ----------------------------------------------------
   function init() {
+    setupTabs();
     byId('btnSave').addEventListener('click', saveScenario);
     byId('btnReset').addEventListener('click', resetScenario);
     byId('fileLoad').addEventListener('change', function (e) {

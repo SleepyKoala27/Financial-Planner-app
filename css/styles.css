@@ -33,11 +33,23 @@ body {
 }
 
 /* ---- header + toolbar ---- */
-.fp-header { padding: 18px 16px 8px; border-bottom: 1px solid var(--line); background: var(--panel); }
-.fp-header h1 { margin: 0 0 4px; font-size: 1.5rem; }
+.fp-header { padding: 14px 16px 0; border-bottom: 1px solid var(--line); background: var(--panel);
+  position: sticky; top: 0; z-index: 20; }
+.fp-header h1 { margin: 0 0 4px; font-size: 1.4rem; }
 .fp-phase { font-size: .8rem; color: var(--accent); vertical-align: middle; }
-.fp-sub { margin: 0 0 12px; color: var(--muted); }
+.fp-sub { margin: 0 0 10px; color: var(--muted); font-size: .9rem; }
 .fp-toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---- tabs (plain CSS/JS; scroll sideways on a narrow screen) ---- */
+.fp-tabs { display: flex; gap: 2px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+  margin: 0 -16px; padding: 0 8px; }
+.fp-tab { flex: 0 0 auto; min-height: 46px; padding: 10px 16px; border: none; background: transparent;
+  border-bottom: 3px solid transparent; color: var(--muted); font-size: 1rem; font-weight: 600;
+  cursor: pointer; touch-action: manipulation; white-space: nowrap; }
+.fp-tab:active { transform: translateY(1px); }
+.fp-tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.fp-panel { animation: fp-fade .15s ease-in; }
+@keyframes fp-fade { from { opacity: 0; } to { opacity: 1; } }
 
 .fp-btn {
   display: inline-flex; align-items: center; gap: 6px;

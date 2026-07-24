@@ -6,6 +6,12 @@
        1) tax-law params   2) structural facts   3) input schema + your data
        4) tax interface     5) the calculation engine
        6) UI helpers (format, charts, tables)     7) the app controller
+
+     The page is organized into four TABS (plain CSS/JS, no libraries):
+       Dashboard — headline metrics + charts
+       Detail    — portfolio totals, per-property tables, sale-year tax
+       Inputs    — settings, residency, custom states, property editors
+       Data      — save / load / reset, import from Excel
      ============================================================================ -->
 <!doctype html>
 <html lang="en">
@@ -23,87 +29,119 @@
       <span class="fp-badge fp-badge-ph">PLACEHOLDER DATA</span>
       <span class="fp-badge fp-badge-prov">FEDERAL TAX = PROVISIONAL</span>
     </p>
-    <div class="fp-toolbar">
-      <button id="btnSave" class="fp-btn" type="button">💾 Save scenario (JSON)</button>
-      <label class="fp-btn fp-btn-file">📂 Load scenario
-        <input id="fileLoad" type="file" accept="application/json,.json" hidden />
-      </label>
-      <button id="btnReset" class="fp-btn" type="button">↺ Reset to sample</button>
-    </div>
+
+    <!-- Tab bar. Scrolls sideways on a narrow screen; each tab is a big touch target. -->
+    <nav class="fp-tabs" role="tablist" aria-label="Sections">
+      <button class="fp-tab" id="tab-dashboard" type="button" role="tab" data-tab="dashboard" aria-selected="true">📊 Dashboard</button>
+      <button class="fp-tab" id="tab-detail" type="button" role="tab" data-tab="detail" aria-selected="false">📑 Detail</button>
+      <button class="fp-tab" id="tab-inputs" type="button" role="tab" data-tab="inputs" aria-selected="false">✏️ Inputs</button>
+      <button class="fp-tab" id="tab-data" type="button" role="tab" data-tab="data" aria-selected="false">💾 Data</button>
+    </nav>
   </header>
 
   <main class="fp-main">
 
-    <!-- ---- Headline metrics ---- -->
-    <section class="fp-section">
-      <h2>Portfolio at a glance</h2>
-      <div id="summaryCards" class="fp-cards"></div>
-      <h3 class="fp-subhead">Per-property return on equity (cash flow ÷ equity)</h3>
-      <div id="propertyMetricCards" class="fp-cards fp-cards-sm"></div>
-    </section>
+    <!-- ===================== TAB: DASHBOARD ===================== -->
+    <div class="fp-panel" id="panel-dashboard" role="tabpanel" aria-labelledby="tab-dashboard">
 
-    <!-- ---- Charts ---- -->
-    <section class="fp-section">
-      <h2>Time-series charts</h2>
-      <div id="charts" class="fp-charts"></div>
-    </section>
+      <section class="fp-section">
+        <h2>Portfolio at a glance</h2>
+        <div id="summaryCards" class="fp-cards"></div>
+        <h3 class="fp-subhead">Per-property return on equity (cash flow ÷ equity)</h3>
+        <div id="propertyMetricCards" class="fp-cards fp-cards-sm"></div>
+      </section>
 
-    <!-- ---- Portfolio table ---- -->
-    <section class="fp-section">
-      <h2>Portfolio totals (year by year)</h2>
-      <div id="portfolioTable"></div>
-    </section>
+      <section class="fp-section">
+        <h2>Time-series charts</h2>
+        <div id="charts" class="fp-charts"></div>
+      </section>
 
-    <!-- ---- Sale-year tax detail ---- -->
-    <section class="fp-section">
-      <h2>Sale-year tax detail</h2>
-      <div id="dispositions"></div>
-    </section>
+    </div>
 
-    <!-- ---- Per-property tables ---- -->
-    <section class="fp-section">
-      <h2>Per-property detail</h2>
-      <div id="propertyTables"></div>
-    </section>
+    <!-- ===================== TAB: DETAIL ===================== -->
+    <div class="fp-panel" id="panel-detail" role="tabpanel" aria-labelledby="tab-detail" hidden>
 
-    <!-- ---- Inputs: global settings ---- -->
-    <section class="fp-section">
-      <h2>Settings</h2>
-      <div id="globalControls" class="fp-fieldgrid"></div>
-    </section>
+      <section class="fp-section">
+        <h2>Portfolio totals (year by year)</h2>
+        <div id="portfolioTable"></div>
+      </section>
 
-    <!-- ---- Inputs: residency by year ---- -->
-    <section class="fp-section">
-      <h2>Residency by year</h2>
-      <p class="fp-muted">Pick where you live each year (WA or CA). This decides the
-        <em>resident state</em> tax on any sale in that year.</p>
-      <div id="residencyEditor"></div>
-    </section>
+      <section class="fp-section">
+        <h2>Sale-year tax detail</h2>
+        <div id="dispositions"></div>
+      </section>
 
-    <!-- ---- Inputs: custom states ---- -->
-    <section class="fp-section">
-      <div class="fp-section-head">
-        <h2>Custom states</h2>
-        <button id="btnAddState" class="fp-btn" type="button">+ Add state</button>
-      </div>
-      <p class="fp-muted">Add a source state or a future domicile with its own income-tax
-        rate. It becomes selectable as a property's state and as a residency. (WA, CA, CO,
-        OR are built in.)</p>
-      <div id="customStatesEditor"></div>
-    </section>
+      <section class="fp-section">
+        <h2>Per-property detail</h2>
+        <div id="propertyTables"></div>
+      </section>
 
-    <!-- ---- Inputs: properties ---- -->
-    <section class="fp-section">
-      <div class="fp-section-head">
-        <h2>Properties</h2>
-        <button id="btnAddProperty" class="fp-btn" type="button">+ Add property</button>
-      </div>
-      <div id="propertyEditors"></div>
-    </section>
+    </div>
+
+    <!-- ===================== TAB: INPUTS ===================== -->
+    <div class="fp-panel" id="panel-inputs" role="tabpanel" aria-labelledby="tab-inputs" hidden>
+
+      <section class="fp-section">
+        <h2>Settings</h2>
+        <div id="globalControls" class="fp-fieldgrid"></div>
+      </section>
+
+      <section class="fp-section">
+        <h2>Residency by year</h2>
+        <p class="fp-muted">Pick where you live each year (WA or CA). This decides the
+          <em>resident state</em> tax on any sale in that year.</p>
+        <div id="residencyEditor"></div>
+      </section>
+
+      <section class="fp-section">
+        <div class="fp-section-head">
+          <h2>Custom states</h2>
+          <button id="btnAddState" class="fp-btn" type="button">+ Add state</button>
+        </div>
+        <p class="fp-muted">Add a source state or a future domicile with its own income-tax
+          rate. It becomes selectable as a property's state and as a residency. (WA, CA, CO,
+          OR are built in.)</p>
+        <div id="customStatesEditor"></div>
+      </section>
+
+      <section class="fp-section">
+        <div class="fp-section-head">
+          <h2>Properties</h2>
+          <button id="btnAddProperty" class="fp-btn" type="button">+ Add property</button>
+        </div>
+        <div id="propertyEditors"></div>
+      </section>
+
+    </div>
+
+    <!-- ===================== TAB: DATA ===================== -->
+    <div class="fp-panel" id="panel-data" role="tabpanel" aria-labelledby="tab-data" hidden>
+
+      <section class="fp-section">
+        <h2>Save &amp; load</h2>
+        <p class="fp-muted">Your data lives only on this device. Save it to a JSON file to
+          keep it; load that file later to pick up where you left off. Nothing is uploaded.</p>
+        <div class="fp-toolbar">
+          <button id="btnSave" class="fp-btn" type="button">💾 Save scenario (JSON)</button>
+          <label class="fp-btn fp-btn-file">📂 Load scenario
+            <input id="fileLoad" type="file" accept="application/json,.json" hidden />
+          </label>
+          <button id="btnReset" class="fp-btn fp-btn-danger" type="button">↺ Reset to sample</button>
+        </div>
+      </section>
+
+      <section class="fp-section">
+        <h2>Import from Excel</h2>
+        <div id="excelImport">
+          <p class="fp-muted">Excel import is coming here.</p>
+        </div>
+      </section>
+
+    </div>
 
     <footer class="fp-footer">
       <p>Real-Estate Modeling Engine · Phase 1 · Deterministic, all-local.
-         Federal tax is provisional (see the sale-tax section). Not tax advice.</p>
+         Federal tax is provisional (see the Detail tab). Not tax advice.</p>
     </footer>
   </main>
 

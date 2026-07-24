@@ -1,0 +1,5 @@
+# The app itself is dependency-free (plain static files, no build step).
+# These appear only when local browser tests pull in playwright-core.
+node_modules/
+package.json
+package-lock.json
