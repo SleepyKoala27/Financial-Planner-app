@@ -106,8 +106,11 @@ FP.seasonalFieldSchema = [
   { key: 'enabled', label: 'Use seasonal (short-term rental) detail', type: 'boolean' },
   { key: 'peakNightlyRate', label: 'Peak nightly rate', type: 'currency' },
   { key: 'peakMonths', label: 'Peak months (count)', type: 'number' },
+  { key: 'peakOccupancyPct', label: 'Peak occupancy', type: 'percent',
+    help: 'Share of peak-season nights booked (peak months are usually higher).' },
   { key: 'offSeasonNightlyRate', label: 'Off-season nightly rate', type: 'currency' },
-  { key: 'occupancyPct', label: 'Occupancy', type: 'percent' }
+  { key: 'offSeasonOccupancyPct', label: 'Off-season occupancy', type: 'percent',
+    help: 'Share of off-season nights booked (usually lower than peak).' }
 ];
 
 // The three tiers, for section headings in the UI.

@@ -398,6 +398,7 @@
         if (!scenario.residencyByYear) { scenario.residencyByYear = []; resizeResidency(); }
         if (!scenario.customStates) scenario.customStates = [];
         if (!scenario.assumptions) scenario.assumptions = {};
+        migrateScenario(scenario);
         rebuildEverything();
       } catch (e) {
         alert('Could not load that file: ' + e.message);
@@ -408,6 +409,21 @@
   function resetScenario() {
     scenario = FP.makeDefaultScenario();
     rebuildEverything();
+  }
+
+  // Bring an older saved scenario up to the current schema so the editors show
+  // sensible values. Currently: B4 split a single seasonal `occupancyPct` into
+  // separate peak / off-season occupancy — carry the old value onto both.
+  function migrateScenario(sc) {
+    (sc.properties || []).forEach(function (p) {
+      var s = p.seasonal;
+      if (!s) return;
+      if (s.occupancyPct !== undefined && s.occupancyPct !== null) {
+        if (s.peakOccupancyPct === undefined || s.peakOccupancyPct === null) s.peakOccupancyPct = s.occupancyPct;
+        if (s.offSeasonOccupancyPct === undefined || s.offSeasonOccupancyPct === null) s.offSeasonOccupancyPct = s.occupancyPct;
+        delete s.occupancyPct;
+      }
+    });
   }
 
   function rebuildEverything() {

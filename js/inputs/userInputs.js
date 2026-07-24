@@ -70,7 +70,7 @@ FP.makeDefaultScenario = function () {
         mortgageOriginationDate: '2019-06-01',
         holdIndefinitely: false, appreciationRate: 0.035, sellingCostsPct: 0.06,
         plannedSaleYear: 2035, section121Eligible: true, transferTaxRate: 0, // CA county rate applies automatically
-        seasonal: { enabled: false, peakNightlyRate: 0, peakMonths: 0, offSeasonNightlyRate: 0, occupancyPct: 0 },
+        seasonal: { enabled: false, peakNightlyRate: 0, peakMonths: 0, offSeasonNightlyRate: 0, peakOccupancyPct: 0, offSeasonOccupancyPct: 0 },
         notes: 'DEMO. Converts primary→rental in 2033 and sells within the ~3-year §121 window. '
              + 'Post-conversion depreciation is recaptured and NOT sheltered by §121. Try moving the sale '
              + 'year to 2037 to see the §121 exclusion lost.'
@@ -99,7 +99,7 @@ FP.makeDefaultScenario = function () {
         mortgageOriginationDate: '2018-01-01',
         holdIndefinitely: false, appreciationRate: 0.04, sellingCostsPct: 0.06,
         plannedSaleYear: 2033, section121Eligible: false, transferTaxRate: 0, // WA REET (graduated) applies automatically
-        seasonal: { enabled: true, peakNightlyRate: 400, peakMonths: 4, offSeasonNightlyRate: 150, occupancyPct: 0.60 },
+        seasonal: { enabled: true, peakNightlyRate: 400, peakMonths: 4, offSeasonNightlyRate: 150, peakOccupancyPct: 0.75, offSeasonOccupancyPct: 0.45 },
         notes: 'DEMO. Held in an S-corp — gain flows through to the personal return in the sale year; the MAGI '
              + 'spike can be timed, not structured away. Washington exempts real estate from its capital-gains excise.'
       },
@@ -125,7 +125,7 @@ FP.makeDefaultScenario = function () {
         mortgageOriginationDate: '2016-04-01',
         holdIndefinitely: true, appreciationRate: 0.03, sellingCostsPct: 0.06,
         plannedSaleYear: 'hold', section121Eligible: false, transferTaxRate: 0,
-        seasonal: { enabled: false, peakNightlyRate: 0, peakMonths: 0, offSeasonNightlyRate: 0, occupancyPct: 0 },
+        seasonal: { enabled: false, peakNightlyRate: 0, peakMonths: 0, offSeasonNightlyRate: 0, peakOccupancyPct: 0, offSeasonOccupancyPct: 0 },
         notes: 'DEMO. Indefinite hold (no sale modeled). A non-resident source-state filing is an accepted cost.'
       },
 
@@ -150,7 +150,7 @@ FP.makeDefaultScenario = function () {
         mortgageOriginationDate: '2017-08-01',
         holdIndefinitely: true, appreciationRate: 0.03, sellingCostsPct: 0.06,
         plannedSaleYear: 'hold', section121Eligible: false, transferTaxRate: 0,
-        seasonal: { enabled: false, peakNightlyRate: 0, peakMonths: 0, offSeasonNightlyRate: 0, occupancyPct: 0 },
+        seasonal: { enabled: false, peakNightlyRate: 0, peakMonths: 0, offSeasonNightlyRate: 0, peakOccupancyPct: 0, offSeasonOccupancyPct: 0 },
         notes: 'DEMO. Indefinite hold (no sale modeled). A non-resident source-state filing is an accepted cost.'
       }
     ]

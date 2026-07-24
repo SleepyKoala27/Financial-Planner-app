@@ -70,10 +70,16 @@ FP.engine = (function () {
   // ---------------------------------------------------------------------------
   function baseGrossRevenue(p) {
     if (p.seasonal && p.seasonal.enabled) {
-      var s = p.seasonal, occ = num(s.occupancyPct);
+      var s = p.seasonal;
+      // B4: peak and off-season occupancy are tracked separately. Migration —
+      // an older scenario carries only a single `occupancyPct`; use it for both
+      // if the split fields are absent.
+      var legacyOcc = num(s.occupancyPct);
+      var peakOcc = (s.peakOccupancyPct === undefined || s.peakOccupancyPct === null) ? legacyOcc : num(s.peakOccupancyPct);
+      var offOcc = (s.offSeasonOccupancyPct === undefined || s.offSeasonOccupancyPct === null) ? legacyOcc : num(s.offSeasonOccupancyPct);
       var peakNights = num(s.peakMonths) * DAYS_PER_MONTH;
       var offNights = (12 - num(s.peakMonths)) * DAYS_PER_MONTH;
-      return num(s.peakNightlyRate) * peakNights * occ + num(s.offSeasonNightlyRate) * offNights * occ;
+      return num(s.peakNightlyRate) * peakNights * peakOcc + num(s.offSeasonNightlyRate) * offNights * offOcc;
     }
     return num(p.grossRentalRevenue);
   }
