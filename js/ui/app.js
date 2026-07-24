@@ -478,6 +478,18 @@
       scenario.customStates.push({ code: '', name: '', rate: 0.05 });
       buildCustomStates();
     });
+
+    // Excel importer (Data tab). Reads an .xlsx on-device and replaces the
+    // scenario; the user then reviews and hits Save scenario to keep it.
+    if (FP.excelImport && byId('excelImport')) {
+      FP.excelImport.mount(byId('excelImport'), function (imported) {
+        scenario = imported;
+        migrateScenario(scenario);
+        if (!scenario.residencyByYear || !scenario.residencyByYear.length) { scenario.residencyByYear = []; resizeResidency(); }
+        rebuildEverything();
+      });
+    }
+
     rebuildEverything();
   }
 
