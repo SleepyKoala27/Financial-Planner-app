@@ -154,7 +154,7 @@ function valFor(p, key, isSeasonal) {
   return v;
 }
 
-function propertyRows(p) {
+function propertyRows(p, blank) {
   const rows = [];
   rows.push(['Tier', 'Field (do not edit labels in column B)', 'Value (enter in column C)', 'Units / notes']);
 
@@ -164,61 +164,89 @@ function propertyRows(p) {
     if (!fields.length) return;
     rows.push([tierNames[tier], '', '', '']);
     fields.forEach(f => {
-      rows.push(['', f.label, valFor(p, f.key, false), unitFor(f, f.key)]);
+      rows.push(['', f.label, blank ? '' : valFor(p, f.key, false), unitFor(f, f.key)]);
     });
     if (tier === 2) {
       rows.push(['Seasonal (short-term rental) detail', '', '', '']);
       FP.seasonalFieldSchema.forEach(f => {
         const key = 'seasonal.' + f.key;
-        rows.push(['', f.label, valFor(p, key, true), unitFor(f, key)]);
+        rows.push(['', f.label, blank ? '' : valFor(p, key, true), unitFor(f, key)]);
       });
     }
   });
 
   // Computed reference values (informational; the importer ignores these labels).
-  const adjBasis = (p.purchasePrice || 0) + (p.capitalImprovements || 0) - (p.accumulatedDepreciation || 0);
-  const equity = (p.marketValue || 0) - (p.mortgageBalance || 0);
   rows.push(['Computed (reference only — not imported)', '', '', '']);
-  rows.push(['', 'Adjusted cost basis (purchase + improvements − depreciation)', adjBasis, 'dollars']);
-  rows.push(['', 'Equity (market value − mortgage)', equity, 'dollars']);
+  if (blank) {
+    rows.push(['', 'Adjusted cost basis (purchase + improvements − depreciation)', '', 'dollars']);
+    rows.push(['', 'Equity (market value − mortgage)', '', 'dollars']);
+  } else {
+    const adjBasis = (p.purchasePrice || 0) + (p.capitalImprovements || 0) - (p.accumulatedDepreciation || 0);
+    const equity = (p.marketValue || 0) - (p.mortgageBalance || 0);
+    rows.push(['', 'Adjusted cost basis (purchase + improvements − depreciation)', adjBasis, 'dollars']);
+    rows.push(['', 'Equity (market value − mortgage)', equity, 'dollars']);
+  }
   return rows;
 }
 
-function readmeRows() {
+function readmeRows(blank) {
   return [
-    ['Real-Estate Modeling Engine — Property Data Collection Template'],
+    ['Real-Estate Modeling Engine — ' + (blank ? 'Property Data Input (blank)' : 'Property Data Collection Template')],
     [''],
     ['How to use this workbook:'],
-    ['1. There is one tab per property. Copy a property tab to add more.'],
+    ['1. There is one tab per property (Property 1, Property 2, …). Copy a property tab to add more.'],
     ['2. On each property tab, enter values in COLUMN C only. Do NOT change the labels in column B.'],
-    ['3. Rates are DECIMALS: 0.05 means 5%. (In Excel you can format the cell as a percentage; the stored value is still the decimal.)'],
-    ['4. Dates are YYYY-MM-DD text (e.g. 2019-06-01).'],
-    ['5. Years are a 4-digit year, or the word "hold" for no sale / no conversion.'],
-    ['6. TRUE/FALSE fields: type TRUE or FALSE.'],
-    ['7. Peak vs off-season occupancy are separate — fill both if the property is a seasonal short-term rental.'],
+    ['3. Start by filling "Property name" and "State" at the top, then work down the tiers.'],
+    ['4. Rates are DECIMALS: 0.05 means 5%. (In Excel you can format the cell as a percentage; the stored value is still the decimal.)'],
+    ['5. Dates are YYYY-MM-DD text (e.g. 2019-06-01).'],
+    ['6. Years are a 4-digit year, or the word "hold" for no sale / no conversion.'],
+    ['7. TRUE/FALSE fields: type TRUE or FALSE.'],
+    ['8. Peak vs off-season occupancy are separate — fill both if the property is a seasonal short-term rental.'],
+    ['9. You can leave any field blank — the app fills a sensible default (e.g. 30-year mortgage term, 6% selling costs).'],
+    [''],
+    ['See the EXAMPLE-Format tab for a fully filled-in property you can copy the style from.'],
     [''],
     ['Importing:'],
     ['- In the app, open the Data tab and choose "Import from Excel (.xlsx)". The file is read on your device only; nothing is uploaded.'],
+    ['- Only tabs that contain data are imported. Empty property tabs are skipped.'],
     ['- After importing, review the numbers, then use "Save scenario (JSON)" to keep them on your device.'],
     [''],
     ['The README, EXAMPLE-Format and any Portfolio-Summary tabs are ignored on import — only property tabs are read.'],
     [''],
-    ['NOTE: Every value already in this template is FICTIONAL DEMO data. Replace it with your own.']
+    [blank
+      ? 'NOTE: The property tabs are blank and ready for your data. The EXAMPLE-Format tab holds FICTIONAL demo values for reference only.'
+      : 'NOTE: Every value already in this template is FICTIONAL DEMO data. Replace it with your own.']
   ];
 }
 
 // ---- assemble the workbook ---------------------------------------------------
+// Modes:
+//   node tools/buildExcelTemplate.js            -> demo-filled template
+//   node tools/buildExcelTemplate.js --blank    -> blank input file (empty tabs)
+//   ... --blank --tabs=6                         -> N blank property tabs (default 6)
+const BLANK = process.argv.includes('--blank');
+const tabsArg = (process.argv.find(a => a.indexOf('--tabs=') === 0) || '').split('=')[1];
+const BLANK_TABS = Math.max(1, Math.min(30, parseInt(tabsArg, 10) || 6));
+
 const scenario = FP.makeDefaultScenario();
 const demoProps = scenario.properties;
 
 const sheets = [];
-sheets.push({ name: 'README', rows: readmeRows() });
-sheets.push({ name: 'EXAMPLE-Format', rows: propertyRows(demoProps[0]) });
-demoProps.forEach((p, i) => {
-  // Sheet names: keep short, strip characters Excel forbids in tab names.
-  let nm = (p.name || ('Property ' + (i + 1))).replace(/[\[\]\:\*\?\/\\]/g, ' ').trim().slice(0, 28) || ('Property ' + (i + 1));
-  sheets.push({ name: nm, rows: propertyRows(p) });
-});
+sheets.push({ name: 'README', rows: readmeRows(BLANK) });
+// A fully filled property is always kept as a visual reference (importer skips it).
+sheets.push({ name: 'EXAMPLE-Format', rows: propertyRows(demoProps[0], false) });
+
+if (BLANK) {
+  for (let i = 0; i < BLANK_TABS; i++) {
+    sheets.push({ name: 'Property ' + (i + 1), rows: propertyRows({}, true) });
+  }
+} else {
+  demoProps.forEach((p, i) => {
+    // Sheet names: keep short, strip characters Excel forbids in tab names.
+    let nm = (p.name || ('Property ' + (i + 1))).replace(/[\[\]\:\*\?\/\\]/g, ' ').trim().slice(0, 28) || ('Property ' + (i + 1));
+    sheets.push({ name: nm, rows: propertyRows(p, false) });
+  });
+}
 
 // Parts.
 const parts = [];
@@ -264,7 +292,8 @@ const files = [
 ];
 
 const out = zip(files);
-const outPath = path.join(ROOT, 'Property Data Collection Template.xlsx');
+const outName = BLANK ? 'Property Data Input (blank).xlsx' : 'Property Data Collection Template.xlsx';
+const outPath = path.join(ROOT, outName);
 fs.writeFileSync(outPath, out);
 console.log('Wrote', outPath, '(' + out.length + ' bytes, ' + files.length + ' parts, ' + sheets.length + ' sheets)');
 void zlib; // (kept available if a future version wants deflate)
